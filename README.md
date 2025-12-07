@@ -42,27 +42,27 @@ Future Updates
 
 1. Dashboard metriche Grafana dashboard con:
 
-FP detection accuracy over time
-Time saved vs manual triage
-Top FP categories
-Escalation rate
+- FP detection accuracy over time
+- Time saved vs manual triage
+- Top FP categories
+- Escalation rate
 
 2. Feedback loop:
 
-L2 può marcare decisioni errate
-Sistema impara e migliora prompt/logic
-Logging per audit trail completo
+- L2 può marcare decisioni errate
+- Sistema impara e migliora prompt/logic
+- Logging per audit trail completo
 
 3. Report automatici:
 
-Daily summary: "Today closed 45 FPs automatically, escalated 3 TPs"
-Weekly pattern analysis
-Export in formato SOC-friendly
+- Daily summary: "Today closed 45 FPs automatically, escalated 3 TPs"
+- Weekly pattern analysis
+- Export in formato SOC-friendly
 
 4. Integrazione Threat Intel:
 
-VirusTotal API per hash
-AbuseIPDB per IP reputation
-URLhaus per domini
-Mostra come arricchimento migliora accuracy
+- VirusTotal API per hash
+- AbuseIPDB per IP reputation
+- URLhaus per domini
+- Mostra come arricchimento migliora accuracy
 
