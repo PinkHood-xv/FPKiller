@@ -1,4 +1,4 @@
-![soc_project_flowchart](https://github.com/user-attachments/assets/4a3ce395-9c35-44a5-b29d-3784951bbdfa)# FPKiller
+# FPKiller
 An AI-powered False Positive alert triage automation using MCP, n8n, and LLM analysis.
 
 
@@ -7,6 +7,8 @@ SOC L1 analysts spend 70-80% of time on false positives. This system automates
 FP detection and documentation, reducing analyst workload by ~60%.
 
 ## Architecture
+
+![soc_project_flowchart](https://github.com/user-attachments/assets/4a3ce395-9c35-44a5-b29d-3784951bbdfa)
 
 ![Uplo![soc_lab_configuration](https://github.com/user-attachments/assets/e4214f46-6753-4be5-8173-1b555711861d)ading soc_project_flowchart.svg…]()
 
