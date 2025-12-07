@@ -1,10 +1,10 @@
 # FPKiller
-An AI-powered False Positive alert triage automation using MCP, n8n, and LLM analysis.
+**An AI-powered False Positive alert triage automation using MCP, n8n, and LLM analysis.**
 
 
 ## Problem Statement
-SOC L1 analysts spend 70-80% of time on false positives. This system automates 
-FP detection and documentation, reducing analyst workload by ~60%.
+**SOC L1 analysts spend 70-80% of time on false positives. This system automates 
+FP detection and documentation, reducing analyst workload by ~60%.**
 
 ## Architecture
 
