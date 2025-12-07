@@ -10,8 +10,6 @@ FP detection and documentation, reducing analyst workload by ~60%.
 
 ![soc_project_flowchart](https://github.com/user-attachments/assets/4a3ce395-9c35-44a5-b29d-3784951bbdfa)
 
-![Uplo![soc_lab_configuration](https://github.com/user-attachments/assets/e4214f46-6753-4be5-8173-1b555711861d)ading soc_project_flowchart.svg…]()
-
 
 ## Results
 - **False Positive Detection Rate**: 85% accuracy
@@ -37,7 +35,7 @@ FP detection and documentation, reducing analyst workload by ~60%.
 2. **On-demand analysis**: Analyst requests deep-dive on specific alert
 3. **Pattern detection**: Identifies recurring FP patterns for rule tuning
 
-## 🎓 What I Learned
+## What I Learned
 [Breve sezione su insights tecnici e sfide superate]
 
 Future Updates
