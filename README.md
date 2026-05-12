@@ -147,7 +147,7 @@ docker compose up -d n8n
 # 5 — (optional) start Ollama and pull a model
 docker compose up -d ollama
 docker exec -it ollama ollama pull phi3.5
-# or: the best model your hardware supports
+# or the best model your hardware supports
 ```
  
 Full step-by-step setup is in [docs/SETUP.md](docs/SETUP.md).
