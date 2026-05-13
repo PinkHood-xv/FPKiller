@@ -6,7 +6,6 @@
 - [Network Topology](#network-topology)
 - [Virtual Machines](#virtual-machines)
 - [Docker Stack](#docker-stack)
-- [Port Reference](#port-reference)
 - [Data Flow](#data-flow)
 - [Firewall Segmentation](#firewall-segmentation)
 - [MCP Server Internals](#mcp-server-internals)
