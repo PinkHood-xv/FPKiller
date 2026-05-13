@@ -95,8 +95,8 @@ The Host-Only network on LAN_AI means the browser on the physical host can reach
 
 ## Virtual Machines
 
-| VM Name | Zone | OS | RAM | CPU | HDD | Role |
-|---|---|---|---|---|---|---|
+| VM Name | Zone | OS | Role |
+|---|---|---|---|
 | `pfSense-Firewall` | All | pfSense CE (FreeBSD) | Central firewall, DHCP, routing |
 | `Ubuntu-AI-Docker` | LAN_AI | Ubuntu Desktop 22.04 | Docker host: N8N, MCP, PostgreSQL, Redis, Ollama |
 | `Ubuntu-SIEM-Wazuh` | LAN_SIEM | Ubuntu Server 22.04 | Wazuh all-in-one (Manager + Indexer + Dashboard) |
