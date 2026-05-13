@@ -1,0 +1,14 @@
+ROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    requests \
+    flask \
+    urllib3
+
+COPY src/ /app/src/
+
+EXPOSE 3333
+
+CMD ["python", "-u", "src/mcp_server.py"]
