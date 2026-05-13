@@ -277,16 +277,7 @@ Rollback at any stage: re-import the previous workflow JSON and redeploy — the
 
 ## Known Issues & Fixes
  
-See [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md) for the full list. Key items:
- 
-| # | Issue | Status |
-|---|---|---|
-| 1 | Wazuh Indexer listens on 127.0.0.1 only | Fixed — `network.host: 0.0.0.0` |
-| 2 | Wazuh API 4.9+ requires JWT, not Basic Auth | Fixed — MCP server uses `get_token()` |
-| 3 | `/alerts` endpoint removed in Wazuh 4.9+ | Fixed — MCP uses OpenSearch :9200 |
-| 4 | N8N 2.1.4 `$1,$2` positional params broken | Fixed — template literals `{{ $json.x }}` |
-| 5 | N8N secure cookie blocks HTTP access | Fixed — `N8N_SECURE_COOKIE=false` in env |
-| 6 | wazuh-integratord calls webhook twice | **Pending** — add `UNIQUE` + `ON CONFLICT DO NOTHING` to `pending_analysis.alert_id` |
+See [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md) for the full list.
  
 ---
 
