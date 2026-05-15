@@ -1,0 +1,285 @@
+{
+  "name": "Wazuh False Positive Detector v5.1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-alerts",
+        "options": {}
+      },
+      "name": "Webhook - Wazuh Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-880, 80],
+      "id": "node-webhook-wazuh-alert",
+      "webhookId": "wazuh-alerts",
+      "notes": "Receives Wazuh alerts via HTTP POST. After import, n8n will auto-generate a new webhookId. Update ossec.conf hook_url accordingly."
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n 2.x wraps webhook body inside $json.body — always unwrap\nconst raw  = $input.item.json;\nconst body = raw.body || raw;\n\nreturn {\n  id:          body.id || body._id || `alert-${Date.now()}`,\n  timestamp:   body.timestamp || new Date().toISOString(),\n  full_log:    body.full_log || body.message || '',\n  location:    body.location || '',\n  data:        body.data || {},\n  rule: {\n    id:          String(body.rule?.id || 'unknown'),\n    description: body.rule?.description || '',\n    level:       Number(body.rule?.level || 0),\n    groups:      body.rule?.groups || []\n  },\n  agent: {\n    id:   String(body.agent?.id || '000'),\n    name: body.agent?.name || 'unknown-agent',\n    ip:   body.agent?.ip || ''\n  }\n};"
+      },
+      "name": "Extract Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-656, 80],
+      "id": "node-extract-alert",
+      "notes": "Unwraps the Wazuh alert from the webhook body envelope and normalises the structure."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mcp-server:3333/analyze_alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "MCP - Enrich Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [-448, 80],
+      "id": "node-mcp-enrich",
+      "notes": "Calls the MCP server (Docker service 'mcp-server') to enrich the alert with Wazuh rule details, agent info, and 24h occurrence count."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check MCP Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-224, 80],
+      "id": "node-check-mcp-success",
+      "notes": "TRUE → enriched path | FALSE → fallback with original alert only"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PATH TRUE — MCP enrichment succeeded\nconst mcpResponse   = $input.item.json;\nconst enrichedAlert = mcpResponse.enriched_alert || {};\nconst originalAlert = enrichedAlert.original_alert || {};\nconst context       = enrichedAlert.context || {};\n\nconst ruleSection = context.rule_details?.success\n  ? `\\nRule Details:\\n${JSON.stringify(context.rule_details.rule, null, 2)}`\n  : '';\n\nconst occSection = (context.recent_occurrences != null)\n  ? `\\nRecent occurrences in last 24h: ${context.recent_occurrences}`\n  : '';\n\nconst agentSection = context.agent_details?.success\n  ? `\\nAgent Status: ${context.agent_details.agent?.status}`\n  : '';\n\nconst prompt =\n`You are a senior cybersecurity analyst specializing in SIEM false positive detection.\n\nALERT DETAILS:\n- Rule ID:          ${originalAlert.rule?.id}\n- Rule Description: ${originalAlert.rule?.description}\n- Alert Level:      ${originalAlert.rule?.level}\n- Agent:            ${originalAlert.agent?.name} (${originalAlert.agent?.ip})\n- Timestamp:        ${originalAlert.timestamp}\n\nFULL LOG:\n${originalAlert.full_log}\n\nMCP CONTEXT:${ruleSection}${occSection}${agentSection}\n\nRespond ONLY with valid JSON (no markdown, no extra text):\n{\n  \"verdict\": \"false_positive\" | \"legitimate_threat\" | \"uncertain\",\n  \"confidence\": 0-100,\n  \"reasoning\": \"detailed explanation\",\n  \"action\": \"ignore\" | \"investigate\" | \"escalate\",\n  \"context_factors\": [\"factor1\"],\n  \"rule_tuning_suggestion\": null\n}`;\n\nreturn {\n  alert_id:      originalAlert.id,\n  rule_id:       String(originalAlert.rule?.id || 'unknown'),\n  agent_name:    originalAlert.agent?.name,\n  prompt_for_ai: prompt,\n  mcp_error:     false\n};"
+      },
+      "name": "Prepare AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "node-prepare-ai-prompt",
+      "notes": "PATH TRUE: builds a full AI prompt using MCP-enriched data (rule details, occurrences, agent status)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// PATH FALSE — MCP unavailable, use raw alert only\nconst alert = $input.item.json;\n\nconst prompt =\n`Analyze this Wazuh alert (LIMITED CONTEXT — MCP unavailable):\n\nRule: ${alert.rule?.id} - ${alert.rule?.description}\nLevel: ${alert.rule?.level}\nAgent: ${alert.agent?.name} (${alert.agent?.ip})\nLog: ${alert.full_log}\n\nRespond ONLY with valid JSON:\n{\n  \"verdict\": \"false_positive\" | \"legitimate_threat\" | \"uncertain\",\n  \"confidence\": 0-100,\n  \"reasoning\": \"explanation\",\n  \"action\": \"ignore\" | \"investigate\" | \"escalate\",\n  \"context_factors\": [],\n  \"rule_tuning_suggestion\": null\n}`;\n\nreturn {\n  alert_id:      alert.id,\n  rule_id:       String(alert.rule?.id || 'unknown'),\n  agent_name:    alert.agent?.name,\n  prompt_for_ai: prompt,\n  mcp_error:     true\n};"
+      },
+      "name": "Fallback - No MCP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 208],
+      "id": "node-fallback-no-mcp",
+      "notes": "PATH FALSE: minimal prompt using only the original alert data when MCP is unreachable."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach the execution resume URL before persisting to DB.\n// NOTE (n8n 2.1.x): $execution.resumeUrl returns the correct\n// webhook-waiting/<executionId> URL without any suffix needed.\nconst data = $input.item.json;\n\nreturn {\n  ...data,\n  resume_url:    $execution.resumeUrl,\n  mcp_error_int: data.mcp_error ? 1 : 0\n};"
+      },
+      "name": "Attach Resume URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 80],
+      "id": "node-attach-resume-url",
+      "notes": "Adds $execution.resumeUrl to the payload so the operator's send_response.sh can resume the correct execution."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pending_analysis\n  (alert_id, rule_id, agent_name, prompt_for_ai, resume_url, mcp_error, status)\nVALUES (\n  '{{ $json.alert_id }}',\n  '{{ $json.rule_id }}',\n  '{{ $json.agent_name }}',\n  '{{ $json.prompt_for_ai.replace(/\\\\/g, \"\\\\\\\\\").replace(/'/g, \"''\") }}',\n  '{{ $json.resume_url }}',\n  {{ $json.mcp_error_int }}::boolean,\n  'pending'\n)\nRETURNING id, alert_id, resume_url;",
+        "options": {}
+      },
+      "name": "Save Pending to DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [448, 80],
+      "id": "node-save-pending-db",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR-POSTGRES-CREDENTIAL-ID",
+          "name": "Lab PostgreSQL"
+        }
+      },
+      "notes": "Persists the prompt and resume URL to pending_analysis before the Wait node suspends execution.\n⚠️ Replace credential id with your own after import.\nOptional dedup fix: add ON CONFLICT (alert_id) DO NOTHING if Wazuh integratord fires twice per alert."
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "options": {
+          "responseData": "{\"status\": \"received\", \"message\": \"AI response accepted, processing...\"}"
+        }
+      },
+      "name": "Wait for AI Response",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [672, 80],
+      "id": "node-wait-ai-response",
+      "webhookId": "REPLACE-WITH-GENERATED-WAIT-WEBHOOK-ID",
+      "notes": "⏸️ Suspends execution until the operator POSTs the AI verdict to the resume URL.\nOperator workflow:\n  1. ./show_pending.sh  → shows prompt\n  2. paste in Claude Pro / ChatGPT\n  3. ./send_response.sh <verdict> <confidence> <action> \"<reasoning>\""
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n 2.x: the Wait node also wraps the resume POST body inside $json.body\nconst raw  = $input.item.json;\nconst body = raw.body || raw;\n\nconst VALID_VERDICTS = ['false_positive', 'legitimate_threat', 'uncertain'];\nconst VALID_ACTIONS  = ['ignore', 'investigate', 'escalate'];\n\nconst verdict    = VALID_VERDICTS.includes(body.verdict) ? body.verdict : 'uncertain';\nconst action     = VALID_ACTIONS.includes(body.action)   ? body.action  : 'investigate';\nconst confidence = Math.min(100, Math.max(0, Number(body.confidence) || 0));\n\nreturn {\n  alert_id:           String(body.alert_id || ''),\n  ai_verdict:         verdict,\n  ai_confidence:      confidence,\n  ai_reasoning:       String(body.reasoning || ''),\n  ai_action:          action,\n  ai_rule_tuning:     body.rule_tuning_suggestion || null,\n  ai_context_factors: Array.isArray(body.context_factors)\n                      ? body.context_factors : []\n};"
+      },
+      "name": "Extract Resume Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 80],
+      "id": "node-extract-resume-data",
+      "notes": "Extracts and validates the AI verdict JSON from the operator's POST body. Sanitises verdict/action to known enums."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Alternative C: embed AI fields as SQL literals so Merge & Validate\n-- can read everything from $input without cross-node references\n-- (which break in n8n 2.1.x when nodes are not directly upstream).\nSELECT\n  id          AS pending_id,\n  alert_id,\n  rule_id,\n  agent_name,\n  mcp_error,\n  '{{ $json.ai_verdict }}'              AS ai_verdict,\n  {{ $json.ai_confidence }}             AS ai_confidence,\n  '{{ $json.ai_reasoning }}'            AS ai_reasoning,\n  '{{ $json.ai_action }}'               AS ai_action,\n  '{{ $json.ai_rule_tuning || \"\" }}'    AS ai_rule_tuning\nFROM pending_analysis\nWHERE alert_id = '{{ $json.alert_id }}'\n  AND status   = 'pending'\nORDER BY created_at DESC\nLIMIT 1;",
+        "options": {}
+      },
+      "name": "Fetch Pending from DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1120, 80],
+      "id": "node-fetch-pending-db",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR-POSTGRES-CREDENTIAL-ID",
+          "name": "Lab PostgreSQL"
+        }
+      },
+      "notes": "Alternative C pattern: AI fields are embedded as SQL literals in the SELECT so the next Code node only needs $input (no cross-node references)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reads everything from $input — Alternative C pattern.\n// All fields (pending metadata + AI response) arrive from Fetch Pending from DB.\nconst d = $input.item.json;\n\nif (!d || d.pending_id == null) {\n  throw new Error(\n    'No pending record found for alert_id: ' + (d?.alert_id || 'unknown') +\n    '. Check that status = pending in pending_analysis.'\n  );\n}\n\n// SQL literal for NULL produces the string \"null\" — normalise it back\nconst ruleTuning = (d.ai_rule_tuning &&\n                    d.ai_rule_tuning !== '' &&\n                    d.ai_rule_tuning !== 'null')\n  ? d.ai_rule_tuning\n  : null;\n\nreturn {\n  pending_id:   Number(d.pending_id),\n  alert_id:     d.alert_id,\n  rule_id:      String(d.rule_id || 'unknown'),\n  agent_name:   String(d.agent_name || ''),\n  mcp_enriched: !d.mcp_error,\n  ai_response: {\n    verdict:                d.ai_verdict,\n    confidence:             Number(d.ai_confidence),\n    reasoning:              d.ai_reasoning,\n    action:                 d.ai_action,\n    rule_tuning_suggestion: ruleTuning\n  }\n};"
+      },
+      "name": "Merge & Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1376, 80],
+      "id": "node-merge-validate",
+      "notes": "Builds the nested ai_response{} object expected by Update & Save Results. Throws a descriptive error if no pending record is found."
+    },
+    {
+      "parameters": {
+        "content": "## 📋 FLOW — v5.1 (semi-automatic, human-in-the-loop)\n\n**1. Webhook** → receives Wazuh alert\n**2. Extract Alert** → unwraps $json.body envelope (n8n 2.x quirk)\n**3. MCP Enrich** → fetches rule details, agent info, 24h occurrences\n**4. Check MCP** → TRUE=enriched path / FALSE=fallback\n**5. Prepare AI Prompt / Fallback** → builds prompt\n**6. Attach Resume URL** → appends $execution.resumeUrl\n**7. Save Pending to DB** → persists to pending_analysis\n**8. Wait** → ⏸️ suspends execution\n\nOperator:\n  ./show_pending.sh   → displays prompt\n  → paste into Claude Pro / ChatGPT\n  ./send_response.sh <verdict> <conf> <action> \"reasoning\"\n\n**9. Extract Resume Data** → validates AI JSON from POST body\n**10. Fetch Pending from DB** → SELECT with embedded AI literals (Alt. C)\n**11. Merge & Validate** → builds nested ai_response{}\n**12. Update & Save Results** → CTE: UPDATE pending + INSERT results atomically\n\n### Key fixes in v5.1\n- ✅ Single CTE node replaces two separate Postgres nodes\n- ✅ RETURNING avoids data loss between sequential Postgres nodes\n- ✅ Alternative C pattern avoids broken cross-node $() references\n- ✅ alert_id no longer undefined at final node\n\n### Known n8n 2.1.x bugs documented in WORKFLOW_KNOWLEDGE_BASE.md\n- Webhook AND Wait node wrap body in $json.body\n- Positional params $1,$2 broken → use template literals\n- $('NodeName').item.json fails for non-upstream nodes\n- Set node overwrites upstream fields → use Code + spread",
+        "height": 560,
+        "width": 500
+      },
+      "name": "Sticky - Flow Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-896, 320],
+      "id": "node-sticky-flow"
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ FUTURE — Direct API path\n\nWhen ready for full automation:\n1. Disable **Wait for AI Response**\n2. Enable **Anthropic API (DISABLED)** node below\n3. Connect: Attach Resume URL → Anthropic → Merge & Validate\n4. In Merge: read $json.content[0].text, JSON.parse it\n5. Save Pending + Fetch Pending become optional\n\nZero refactor on the rest of the chain.\n\nAlternatively: swap Anthropic node for Ollama\n(see v6.1 workflow for the fully-automated Ollama variant).",
+        "height": 240,
+        "width": 400
+      },
+      "name": "Sticky - Future API",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [224, 320],
+      "id": "node-sticky-future-api"
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-20250514",
+        "options": {}
+      },
+      "name": "Anthropic API (DISABLED - FUTURE)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.1,
+      "position": [448, 400],
+      "id": "node-anthropic-disabled",
+      "disabled": true,
+      "notes": "FUTURE: enable to migrate to direct API calls. Requires Anthropic credential configured in n8n Settings → Credentials."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- CTE atomically marks the pending record as completed AND inserts the result.\n-- Using a single statement avoids data loss between sequential Postgres nodes\n-- (n8n 2.1.x bug: sequential Postgres nodes overwrite $json).\nWITH updated AS (\n  UPDATE pending_analysis\n  SET status       = 'completed',\n      completed_at = NOW()\n  WHERE id = {{ $json.pending_id }}\n)\nINSERT INTO ai_analysis_results (\n  alert_id,\n  rule_id,\n  agent_name,\n  verdict,\n  confidence,\n  reasoning,\n  action,\n  rule_tuning,\n  mcp_enriched\n)\nVALUES (\n  '{{ $json.alert_id }}',\n  '{{ $json.rule_id }}',\n  '{{ $json.agent_name }}',\n  '{{ $json.ai_response.verdict }}',\n  {{ $json.ai_response.confidence }},\n  '{{ $json.ai_response.reasoning.replace(/'/g, \"''\") }}',\n  '{{ $json.ai_response.action }}',\n  '{{ ($json.ai_response.rule_tuning_suggestion != null && $json.ai_response.rule_tuning_suggestion !== \"null\") ? String($json.ai_response.rule_tuning_suggestion).replace(/'/g, \"''\") : \"\" }}',\n  {{ $json.mcp_enriched }}\n)\nRETURNING\n  id            AS result_id,\n  alert_id,\n  verdict,\n  confidence,\n  processed_at;",
+        "options": {}
+      },
+      "name": "Update & Save Results",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1600, 80],
+      "id": "node-update-save-results",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR-POSTGRES-CREDENTIAL-ID",
+          "name": "Lab PostgreSQL"
+        }
+      },
+      "notes": "CTE: atomically marks pending_analysis row as completed AND inserts into ai_analysis_results. RETURNING prevents data loss between sequential Postgres nodes."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Wazuh Alert": {
+      "main": [[{"node": "Extract Alert", "type": "main", "index": 0}]]
+    },
+    "Extract Alert": {
+      "main": [[{"node": "MCP - Enrich Alert", "type": "main", "index": 0}]]
+    },
+    "MCP - Enrich Alert": {
+      "main": [[{"node": "Check MCP Success", "type": "main", "index": 0}]]
+    },
+    "Check MCP Success": {
+      "main": [
+        [{"node": "Prepare AI Prompt", "type": "main", "index": 0}],
+        [{"node": "Fallback - No MCP",  "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare AI Prompt": {
+      "main": [[{"node": "Attach Resume URL", "type": "main", "index": 0}]]
+    },
+    "Fallback - No MCP": {
+      "main": [[{"node": "Attach Resume URL", "type": "main", "index": 0}]]
+    },
+    "Attach Resume URL": {
+      "main": [[{"node": "Save Pending to DB", "type": "main", "index": 0}]]
+    },
+    "Save Pending to DB": {
+      "main": [[{"node": "Wait for AI Response", "type": "main", "index": 0}]]
+    },
+    "Wait for AI Response": {
+      "main": [[{"node": "Extract Resume Data", "type": "main", "index": 0}]]
+    },
+    "Extract Resume Data": {
+      "main": [[{"node": "Fetch Pending from DB", "type": "main", "index": 0}]]
+    },
+    "Fetch Pending from DB": {
+      "main": [[{"node": "Merge & Validate", "type": "main", "index": 0}]]
+    },
+    "Merge & Validate": {
+      "main": [[{"node": "Update & Save Results", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "UTC",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "instanceId": "REPLACE-WITH-YOUR-INSTANCE-ID"
+  },
+  "tags": ["wazuh", "siem", "false-positive", "mcp", "semi-automatic"]
+}
