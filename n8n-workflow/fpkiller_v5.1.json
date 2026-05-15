@@ -1,5 +1,5 @@
 {
-  "name": "Wazuh False Positive Detector v5.1",
+  "name": "FPKiller v5.1",
   "nodes": [
     {
       "parameters": {
