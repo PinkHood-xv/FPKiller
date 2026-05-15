@@ -1,0 +1,243 @@
+{
+  "name": "FPKiller v6.2 (OpenRouter)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-alerts",
+        "options": {}
+      },
+      "name": "Webhook - Wazuh Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-960, 128],
+      "id": "node-webhook-wazuh-alert",
+      "webhookId": "wazuh-alerts",
+      "notes": "Receives Wazuh alerts via HTTP POST. After import n8n regenerates the webhookId — update ossec.conf hook_url accordingly."
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n 2.x wraps webhook body inside $json.body — always unwrap\nconst raw  = $input.item.json;\nconst body = raw.body || raw;\n\nreturn {\n  id:          body.id || body._id || `alert-${Date.now()}`,\n  timestamp:   body.timestamp || new Date().toISOString(),\n  full_log:    body.full_log || body.message || '',\n  location:    body.location || '',\n  data:        body.data || {},\n  rule: {\n    id:          String(body.rule?.id || 'unknown'),\n    description: body.rule?.description || '',\n    level:       Number(body.rule?.level || 0),\n    groups:      body.rule?.groups || []\n  },\n  agent: {\n    id:   String(body.agent?.id || '000'),\n    name: body.agent?.name || 'unknown-agent',\n    ip:   body.agent?.ip || ''\n  }\n};"
+      },
+      "name": "Extract Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 128],
+      "id": "node-extract-alert",
+      "notes": "Unwraps the Wazuh alert from the webhook body envelope and normalises the structure."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mcp-server:3333/analyze_alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "MCP - Enrich Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [-480, 128],
+      "id": "node-mcp-enrich",
+      "notes": "Calls the MCP server (Docker service 'mcp-server') to enrich the alert with Wazuh rule details, agent info, and 24h occurrence count."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check MCP Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-240, 128],
+      "id": "node-check-mcp-success",
+      "notes": "TRUE → enriched path | FALSE → fallback with original alert only"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PATH TRUE — MCP enrichment succeeded\n// Short prompt: works well with both free-tier and paid OpenRouter models.\nconst mcpResponse   = $input.item.json;\nconst enrichedAlert = mcpResponse.enriched_alert || {};\nconst originalAlert = enrichedAlert.original_alert || {};\nconst context       = enrichedAlert.context || {};\n\nconst rule    = originalAlert.rule   || {};\nconst agent   = originalAlert.agent  || {};\nconst log     = (originalAlert.full_log || '').slice(0, 120);\nconst occ     = context.recent_occurrences ?? '?';\nconst agentSt = context.agent_details?.agent?.status || '?';\n\nconst prompt =\n  `Rule ${rule.id} L${rule.level}: ${(rule.description||'').slice(0,60)}\\n` +\n  `Agent: ${agent.name} ${agent.ip} status:${agentSt}\\n` +\n  `Log: ${log}\\n` +\n  `Occurrences 24h: ${occ}`;\n\nreturn {\n  alert_id:      originalAlert.id,\n  rule_id:       String(rule.id || 'unknown'),\n  agent_name:    agent.name,\n  prompt_for_ai: prompt,\n  mcp_error:     false\n};"
+      },
+      "name": "Prepare AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "node-prepare-ai-prompt",
+      "notes": "PATH TRUE: builds a compact prompt using MCP context. Truncated to ~120 chars."
+    },
+    {
+      "parameters": {
+        "jsCode": "// PATH FALSE — MCP unavailable, use raw alert only\nconst alert = $input.item.json;\nconst rule  = alert.rule  || {};\nconst agent = alert.agent || {};\n\nconst prompt =\n  `Rule ${rule.id} L${rule.level}: ${(rule.description||'').slice(0,60)}\\n` +\n  `Agent: ${agent.name} ${agent.ip}\\n` +\n  `Log: ${(alert.full_log||'').slice(0,120)}`;\n\nreturn {\n  alert_id:      alert.id,\n  rule_id:       String(rule.id || 'unknown'),\n  agent_name:    agent.name,\n  prompt_for_ai: prompt,\n  mcp_error:     true\n};"
+      },
+      "name": "Fallback - No MCP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 240],
+      "id": "node-fallback-no-mcp",
+      "notes": "PATH FALSE: minimal prompt using only the original alert data when MCP is unreachable."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build an OpenAI-compatible request body for OpenRouter.\n// OpenRouter accepts the same format as the OpenAI Chat Completions API.\n//\n// SETUP:\n//   1. Create an account at https://openrouter.ai\n//   2. Generate an API key in the dashboard\n//   3. Add to n8n docker-compose.yml environment:\n//        OPENROUTER_API_KEY=sk-or-v1-YOUR-KEY-HERE\n//   4. Optionally set OPENROUTER_MODEL (default: mistralai/mistral-7b-instruct:free)\n//      Free models: mistralai/mistral-7b-instruct:free\n//                   meta-llama/llama-3-8b-instruct:free\n//                   google/gemma-2-9b-it:free\n//      Paid models: mistralai/mistral-small, openai/gpt-4o-mini, etc.\n//      Full list: https://openrouter.ai/models\n\nconst data  = $input.item.json;\nconst model = process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free';\n\nconst systemMessage = {\n  role: 'system',\n  content:\n    'You are a cybersecurity analyst. ' +\n    'Respond ONLY with a valid JSON object, no markdown, no extra text. ' +\n    'Required keys: verdict (false_positive|legitimate_threat|uncertain), ' +\n    'confidence (integer 0-100), reasoning (string max 100 chars), ' +\n    'action (ignore|investigate|escalate), ' +\n    'context_factors (array of strings), ' +\n    'rule_tuning_suggestion (string or null).'\n};\n\nconst userMessage = {\n  role: 'user',\n  content: 'ALERT:\\n' + data.prompt_for_ai\n};\n\nreturn {\n  alert_id:     data.alert_id,\n  rule_id:      data.rule_id,\n  agent_name:   data.agent_name,\n  mcp_enriched: !data.mcp_error,\n  openrouter_body: {\n    model:       model,\n    messages:    [systemMessage, userMessage],\n    temperature: 0.1,\n    max_tokens:  250,\n    // Optional OpenRouter headers (for analytics in your dashboard)\n    // These are passed via HTTP headers in the Call node, not in the body.\n    stream: false\n  }\n};"
+      },
+      "name": "Build OpenRouter Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 128],
+      "id": "node-build-openrouter-request",
+      "notes": "Builds an OpenAI-compatible Chat Completions payload for OpenRouter.\nSet OPENROUTER_MODEL env var to override the default free model.\nSee https://openrouter.ai/models for available models."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENROUTER_API_KEY }}"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://github.com/YOUR-USERNAME/wazuh-fp-detector"
+            },
+            {
+              "name": "X-Title",
+              "value": "Wazuh FP Detector"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.openrouter_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "name": "Call OpenRouter API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 128],
+      "id": "node-call-openrouter",
+      "onError": "continueErrorOutput",
+      "notes": "POST to OpenRouter (OpenAI-compatible endpoint).\nAuthentication: Bearer token from OPENROUTER_API_KEY env var.\nHTTP-Referer and X-Title are optional but help identify traffic in your OpenRouter dashboard.\ntimeout: 60s (cloud API is faster than local inference).\n⚠️ Replace HTTP-Referer with your actual repo URL."
+    },
+    {
+      "parameters": {
+        "jsCode": "// OpenRouter API call failed (network error, auth error, rate limit, etc.)\n// Produces an 'uncertain / investigate' record so the pipeline never breaks.\nconst errorData = $input.item.json;\n\nlet metadata;\ntry {\n  metadata = $('Build OpenRouter Request').item.json;\n} catch(e) {\n  metadata = {\n    alert_id:     'openrouter-error-' + Date.now(),\n    rule_id:      'unknown',\n    agent_name:   'unknown',\n    mcp_enriched: false\n  };\n}\n\nconst errorMsg = errorData?.error?.message\n  || errorData?.message\n  || JSON.stringify(errorData).slice(0, 300);\n\nreturn {\n  alert_id:     metadata.alert_id,\n  rule_id:      metadata.rule_id,\n  agent_name:   metadata.agent_name,\n  mcp_enriched: metadata.mcp_enriched,\n  ai_response: {\n    verdict:                'uncertain',\n    confidence:             0,\n    reasoning:              'OpenRouter API error: ' + errorMsg,\n    action:                 'investigate',\n    context_factors:        ['openrouter_unavailable'],\n    rule_tuning_suggestion: null\n  }\n};"
+      },
+      "name": "Handle OpenRouter Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 288],
+      "id": "node-handle-openrouter-error",
+      "notes": "Graceful degradation: creates an 'uncertain' record on any OpenRouter failure (network, auth, rate limit). Pipeline continues to Save to DB."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the OpenAI-compatible response from OpenRouter.\n// Response format: { choices: [{ message: { content: '<JSON string>' } }] }\n// Strip markdown fences in case the model wraps its output.\nconst apiResponse = $input.item.json;\n\nlet metadata;\ntry {\n  metadata = $('Build OpenRouter Request').item.json;\n} catch(e) {\n  metadata = {\n    alert_id:     'parse-error-' + Date.now(),\n    rule_id:      'unknown',\n    agent_name:   'unknown',\n    mcp_enriched: false\n  };\n}\n\n// OpenAI-compatible format\nconst rawContent = apiResponse?.choices?.[0]?.message?.content || '';\n\nconst cleanContent = rawContent\n  .replace(/```json\\s*/gi, '')\n  .replace(/```\\s*/g, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleanContent);\n} catch(e) {\n  parsed = {\n    verdict:                'uncertain',\n    confidence:             0,\n    reasoning:              'Parse error: ' + e.message + ' | raw: ' + rawContent.slice(0, 100),\n    action:                 'investigate',\n    context_factors:        ['parse_error'],\n    rule_tuning_suggestion: null\n  };\n}\n\nconst VALID_VERDICTS = ['false_positive', 'legitimate_threat', 'uncertain'];\nconst VALID_ACTIONS  = ['ignore', 'investigate', 'escalate'];\n\nreturn {\n  alert_id:     metadata.alert_id,\n  rule_id:      metadata.rule_id,\n  agent_name:   metadata.agent_name,\n  mcp_enriched: metadata.mcp_enriched,\n  ai_response: {\n    verdict:                VALID_VERDICTS.includes(parsed.verdict) ? parsed.verdict : 'uncertain',\n    confidence:             Math.min(100, Math.max(0, Number(parsed.confidence) || 0)),\n    reasoning:              String(parsed.reasoning || ''),\n    action:                 VALID_ACTIONS.includes(parsed.action) ? parsed.action : 'investigate',\n    context_factors:        Array.isArray(parsed.context_factors) ? parsed.context_factors : [],\n    rule_tuning_suggestion: (parsed.rule_tuning_suggestion && parsed.rule_tuning_suggestion !== 'null')\n                            ? String(parsed.rule_tuning_suggestion) : null\n  }\n};"
+      },
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 128],
+      "id": "node-parse-llm-response",
+      "notes": "Parses the OpenAI-compatible choices[0].message.content response from OpenRouter. Falls back to 'uncertain' if JSON is malformed."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ai_analysis_results (\n  alert_id,\n  rule_id,\n  agent_name,\n  verdict,\n  confidence,\n  reasoning,\n  action,\n  rule_tuning,\n  mcp_enriched\n)\nVALUES (\n  '{{ $json.alert_id }}',\n  '{{ $json.rule_id }}',\n  '{{ $json.agent_name }}',\n  '{{ $json.ai_response.verdict }}',\n  {{ $json.ai_response.confidence }},\n  '{{ $json.ai_response.reasoning.replace(/\\'/g, \"''\") }}',\n  '{{ $json.ai_response.action }}',\n  '{{ ($json.ai_response.rule_tuning_suggestion != null && $json.ai_response.rule_tuning_suggestion !== \"null\") ? String($json.ai_response.rule_tuning_suggestion).replace(/\\'/g, \"''\") : \"\" }}',\n  {{ $json.mcp_enriched }}\n)\nRETURNING id, alert_id, verdict, confidence, processed_at;",
+        "options": {}
+      },
+      "name": "Save to ai_analysis_results",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [960, 160],
+      "id": "node-save-results",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR-POSTGRES-CREDENTIAL-ID",
+          "name": "Lab PostgreSQL"
+        }
+      },
+      "notes": "Final INSERT into ai_analysis_results. Receives from both Parse LLM Response (success) and Handle OpenRouter Error (failure).\n⚠️ Replace credential id with your own after import."
+    },
+    {
+      "parameters": {
+        "content": "## Wazuh FP Detector v6.2 — OpenRouter (fully automatic, cloud)\n\n**Flow:**\n```\nWebhook → Extract Alert → MCP Enrich → Check MCP\n  ├─ TRUE  → Prepare AI Prompt  ─┐\n  └─ FALSE → Fallback - No MCP  ─┤\n                                  └→ Build OpenRouter Request\n                                        → Call OpenRouter API\n                                          ├─ success → Parse LLM Response  ─┐\n                                          └─ error   → Handle OpenRouter Error ─┤\n                                                                                 └→ Save to DB\n```\n\n**Changes from v6.1 (Ollama):**\n- Removed: local Ollama container dependency\n- Changed: Call Ollama API → Call OpenRouter API (OpenAI-compatible)\n- Changed: response parsing → choices[0].message.content (OpenAI format)\n- Added: HTTP-Referer / X-Title headers for OpenRouter analytics\n\n**Setup:**\n  1. Create account at https://openrouter.ai\n  2. Generate an API key\n  3. Add to docker-compose.yml n8n environment:\n       OPENROUTER_API_KEY=sk-or-v1-YOUR-KEY-HERE\n       OPENROUTER_MODEL=mistralai/mistral-7b-instruct:free\n  4. Update HTTP-Referer in Call OpenRouter API node\n\n**Free models (as of 2025):**\n  - mistralai/mistral-7b-instruct:free\n  - meta-llama/llama-3-8b-instruct:free\n  - google/gemma-2-9b-it:free\n  Full list: https://openrouter.ai/models\n\n**Rollback:**\n  - Human-in-the-loop: import v5.1\n  - Local inference:   import v6.1 (Ollama)",
+        "height": 500,
+        "width": 580
+      },
+      "name": "Sticky Note - v6.2 Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-960, 384],
+      "id": "node-sticky-overview"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Wazuh Alert": {
+      "main": [[{"node": "Extract Alert", "type": "main", "index": 0}]]
+    },
+    "Extract Alert": {
+      "main": [[{"node": "MCP - Enrich Alert", "type": "main", "index": 0}]]
+    },
+    "MCP - Enrich Alert": {
+      "main": [[{"node": "Check MCP Success", "type": "main", "index": 0}]]
+    },
+    "Check MCP Success": {
+      "main": [
+        [{"node": "Prepare AI Prompt", "type": "main", "index": 0}],
+        [{"node": "Fallback - No MCP", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare AI Prompt": {
+      "main": [[{"node": "Build OpenRouter Request", "type": "main", "index": 0}]]
+    },
+    "Fallback - No MCP": {
+      "main": [[{"node": "Build OpenRouter Request", "type": "main", "index": 0}]]
+    },
+    "Build OpenRouter Request": {
+      "main": [[{"node": "Call OpenRouter API", "type": "main", "index": 0}]]
+    },
+    "Call OpenRouter API": {
+      "main": [
+        [{"node": "Parse LLM Response",       "type": "main", "index": 0}],
+        [{"node": "Handle OpenRouter Error",   "type": "main", "index": 0}]
+      ]
+    },
+    "Parse LLM Response": {
+      "main": [[{"node": "Save to ai_analysis_results", "type": "main", "index": 0}]]
+    },
+    "Handle OpenRouter Error": {
+      "main": [[{"node": "Save to ai_analysis_results", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "meta": {
+    "instanceId": "REPLACE-WITH-YOUR-INSTANCE-ID"
+  },
+  "tags": ["wazuh", "siem", "false-positive", "mcp", "openrouter", "cloud-llm", "automatic"]
+}
