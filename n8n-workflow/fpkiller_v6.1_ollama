@@ -1,0 +1,237 @@
+{
+  "name": "FPKiller v6.1 (Ollama)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-alerts",
+        "options": {}
+      },
+      "name": "Webhook - Wazuh Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-960, 128],
+      "id": "node-webhook-wazuh-alert",
+      "webhookId": "wazuh-alerts",
+      "notes": "Receives Wazuh alerts via HTTP POST. After import n8n regenerates the webhookId — update ossec.conf hook_url accordingly."
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n 2.x wraps webhook body inside $json.body — always unwrap\nconst raw  = $input.item.json;\nconst body = raw.body || raw;\n\nreturn {\n  id:          body.id || body._id || `alert-${Date.now()}`,\n  timestamp:   body.timestamp || new Date().toISOString(),\n  full_log:    body.full_log || body.message || '',\n  location:    body.location || '',\n  data:        body.data || {},\n  rule: {\n    id:          String(body.rule?.id || 'unknown'),\n    description: body.rule?.description || '',\n    level:       Number(body.rule?.level || 0),\n    groups:      body.rule?.groups || []\n  },\n  agent: {\n    id:   String(body.agent?.id || '000'),\n    name: body.agent?.name || 'unknown-agent',\n    ip:   body.agent?.ip || ''\n  }\n};"
+      },
+      "name": "Extract Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 128],
+      "id": "node-extract-alert",
+      "notes": "Unwraps the Wazuh alert from the webhook body envelope and normalises the structure."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mcp-server:3333/analyze_alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "MCP - Enrich Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [-480, 128],
+      "id": "node-mcp-enrich",
+      "notes": "Calls the MCP server (Docker service 'mcp-server') to enrich the alert with Wazuh rule details, agent info, and 24h occurrence count."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check MCP Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-240, 128],
+      "id": "node-check-mcp-success",
+      "notes": "TRUE → enriched path | FALSE → fallback with original alert only"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PATH TRUE — MCP enrichment succeeded\n// Short prompt: optimised for small local models (context window ~2k tokens)\nconst mcpResponse   = $input.item.json;\nconst enrichedAlert = mcpResponse.enriched_alert || {};\nconst originalAlert = enrichedAlert.original_alert || {};\nconst context       = enrichedAlert.context || {};\n\nconst rule    = originalAlert.rule   || {};\nconst agent   = originalAlert.agent  || {};\nconst log     = (originalAlert.full_log || '').slice(0, 120);   // truncate to save tokens\nconst occ     = context.recent_occurrences ?? '?';\nconst agentSt = context.agent_details?.agent?.status || '?';\n\nconst prompt =\n  `Rule ${rule.id} L${rule.level}: ${(rule.description||'').slice(0,60)}\\n` +\n  `Agent: ${agent.name} ${agent.ip} status:${agentSt}\\n` +\n  `Log: ${log}\\n` +\n  `Occurrences 24h: ${occ}`;\n\nreturn {\n  alert_id:      originalAlert.id,\n  rule_id:       String(rule.id || 'unknown'),\n  agent_name:    agent.name,\n  prompt_for_ai: prompt,\n  mcp_error:     false\n};"
+      },
+      "name": "Prepare AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "node-prepare-ai-prompt",
+      "notes": "PATH TRUE: builds a compact prompt using MCP context. Truncated to ~120 chars to stay within small-model context windows."
+    },
+    {
+      "parameters": {
+        "jsCode": "// PATH FALSE — MCP unavailable, use raw alert only\nconst alert = $input.item.json;\nconst rule  = alert.rule  || {};\nconst agent = alert.agent || {};\n\nconst prompt =\n  `Rule ${rule.id} L${rule.level}: ${(rule.description||'').slice(0,60)}\\n` +\n  `Agent: ${agent.name} ${agent.ip}\\n` +\n  `Log: ${(alert.full_log||'').slice(0,120)}`;\n\nreturn {\n  alert_id:      alert.id,\n  rule_id:       String(rule.id || 'unknown'),\n  agent_name:    agent.name,\n  prompt_for_ai: prompt,\n  mcp_error:     true\n};"
+      },
+      "name": "Fallback - No MCP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 240],
+      "id": "node-fallback-no-mcp",
+      "notes": "PATH FALSE: minimal prompt using only the original alert data when MCP is unreachable."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the request body for Ollama /api/generate endpoint.\n// Model is read from the OLLAMA_MODEL env var injected into the n8n container,\n// with a fallback to 'mistral' if not set.\n// format:'json' forces Ollama to return valid JSON (requires Ollama >= 0.1.9).\nconst data  = $input.item.json;\nconst model = process.env.OLLAMA_MODEL || 'mistral';\n\nconst systemPrompt =\n  'You are a cybersecurity analyst. ' +\n  'Respond ONLY with a valid JSON object, no markdown, no extra text. ' +\n  'Required keys: verdict (false_positive|legitimate_threat|uncertain), ' +\n  'confidence (integer 0-100), reasoning (string max 100 chars), ' +\n  'action (ignore|investigate|escalate), ' +\n  'context_factors (array of strings), ' +\n  'rule_tuning_suggestion (string or null).';\n\nconst fullPrompt = systemPrompt + '\\n\\nALERT:\\n' + data.prompt_for_ai;\n\nreturn {\n  alert_id:     data.alert_id,\n  rule_id:      data.rule_id,\n  agent_name:   data.agent_name,\n  mcp_enriched: !data.mcp_error,\n  ollama_body: {\n    model:  model,\n    prompt: fullPrompt,\n    stream: false,\n    format: 'json',\n    options: {\n      temperature: 0.1,\n      num_predict: 200\n    }\n  }\n};"
+      },
+      "name": "Build Ollama Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 128],
+      "id": "node-build-ollama-request",
+      "notes": "Builds the Ollama /api/generate payload.\nModel: set OLLAMA_MODEL env var in docker-compose.yml (default: mistral).\nformat:'json' enforces structured output — requires Ollama >= 0.1.9."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.ollama_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 300000
+        }
+      },
+      "name": "Call Ollama API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 128],
+      "id": "node-call-ollama",
+      "onError": "continueErrorOutput",
+      "notes": "POST to Ollama Docker service on port 11434.\ntimeout: 300s — increase for slow CPU inference.\nonError: continueErrorOutput → routes failures to Handle Ollama Error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ollama HTTP call failed or returned an error body.\n// Produces an 'uncertain / investigate' record so the pipeline never breaks.\nconst errorData = $input.item.json;\n\nlet metadata;\ntry {\n  metadata = $('Build Ollama Request').item.json;\n} catch(e) {\n  metadata = {\n    alert_id:     'ollama-error-' + Date.now(),\n    rule_id:      'unknown',\n    agent_name:   'unknown',\n    mcp_enriched: false\n  };\n}\n\nconst errorMsg = errorData?.message\n  || errorData?.error\n  || JSON.stringify(errorData).slice(0, 300);\n\nreturn {\n  alert_id:     metadata.alert_id,\n  rule_id:      metadata.rule_id,\n  agent_name:   metadata.agent_name,\n  mcp_enriched: metadata.mcp_enriched,\n  ai_response: {\n    verdict:                'uncertain',\n    confidence:             0,\n    reasoning:              'Ollama API error: ' + errorMsg,\n    action:                 'investigate',\n    context_factors:        ['ollama_unavailable'],\n    rule_tuning_suggestion: null\n  }\n};"
+      },
+      "name": "Handle Ollama Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 288],
+      "id": "node-handle-ollama-error",
+      "notes": "Graceful degradation: creates an 'uncertain' record when Ollama is unreachable or returns an error. Pipeline continues to Save to DB."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse and validate the JSON returned by Ollama /api/generate.\n// Ollama wraps the model output in the 'response' field.\n// Strips markdown fences in case the model ignores format:'json'.\nconst ollamaResponse = $input.item.json;\n\nlet metadata;\ntry {\n  metadata = $('Build Ollama Request').item.json;\n} catch(e) {\n  metadata = {\n    alert_id:     'parse-error-' + Date.now(),\n    rule_id:      'unknown',\n    agent_name:   'unknown',\n    mcp_enriched: false\n  };\n}\n\n// /api/generate → 'response' field\n// /api/chat     → 'message.content' field (kept for compatibility)\nconst rawContent = ollamaResponse?.response\n  || ollamaResponse?.message?.content\n  || '';\n\nconst cleanContent = rawContent\n  .replace(/```json\\s*/gi, '')\n  .replace(/```\\s*/g, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleanContent);\n} catch(e) {\n  parsed = {\n    verdict:                'uncertain',\n    confidence:             0,\n    reasoning:              'Parse error: ' + e.message + ' | raw: ' + rawContent.slice(0, 100),\n    action:                 'investigate',\n    context_factors:        ['parse_error'],\n    rule_tuning_suggestion: null\n  };\n}\n\nconst VALID_VERDICTS = ['false_positive', 'legitimate_threat', 'uncertain'];\nconst VALID_ACTIONS  = ['ignore', 'investigate', 'escalate'];\n\nreturn {\n  alert_id:     metadata.alert_id,\n  rule_id:      metadata.rule_id,\n  agent_name:   metadata.agent_name,\n  mcp_enriched: metadata.mcp_enriched,\n  ai_response: {\n    verdict:                VALID_VERDICTS.includes(parsed.verdict) ? parsed.verdict : 'uncertain',\n    confidence:             Math.min(100, Math.max(0, Number(parsed.confidence) || 0)),\n    reasoning:              String(parsed.reasoning || ''),\n    action:                 VALID_ACTIONS.includes(parsed.action) ? parsed.action : 'investigate',\n    context_factors:        Array.isArray(parsed.context_factors) ? parsed.context_factors : [],\n    rule_tuning_suggestion: (parsed.rule_tuning_suggestion && parsed.rule_tuning_suggestion !== 'null')\n                            ? String(parsed.rule_tuning_suggestion) : null\n  }\n};"
+      },
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 128],
+      "id": "node-parse-llm-response",
+      "notes": "Parses and validates Ollama JSON output. Falls back to 'uncertain' if JSON is malformed or missing required fields."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ai_analysis_results (\n  alert_id,\n  rule_id,\n  agent_name,\n  verdict,\n  confidence,\n  reasoning,\n  action,\n  rule_tuning,\n  mcp_enriched\n)\nVALUES (\n  '{{ $json.alert_id }}',\n  '{{ $json.rule_id }}',\n  '{{ $json.agent_name }}',\n  '{{ $json.ai_response.verdict }}',\n  {{ $json.ai_response.confidence }},\n  '{{ $json.ai_response.reasoning.replace(/\\'/g, \"''\") }}',\n  '{{ $json.ai_response.action }}',\n  '{{ ($json.ai_response.rule_tuning_suggestion != null && $json.ai_response.rule_tuning_suggestion !== \"null\") ? String($json.ai_response.rule_tuning_suggestion).replace(/\\'/g, \"''\") : \"\" }}',\n  {{ $json.mcp_enriched }}\n)\nRETURNING id, alert_id, verdict, confidence, processed_at;",
+        "options": {}
+      },
+      "name": "Save to ai_analysis_results",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [960, 160],
+      "id": "node-save-results",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR-POSTGRES-CREDENTIAL-ID",
+          "name": "Lab PostgreSQL"
+        }
+      },
+      "notes": "Final INSERT into ai_analysis_results. Receives from both Parse LLM Response (success) and Handle Ollama Error (failure).\n⚠️ Replace credential id with your own after import."
+    },
+    {
+      "parameters": {
+        "content": "## Wazuh FP Detector v6.1 — Ollama (fully automatic)\n\n**Flow:**\n```\nWebhook → Extract Alert → MCP Enrich → Check MCP\n  ├─ TRUE  → Prepare AI Prompt  ─┐\n  └─ FALSE → Fallback - No MCP  ─┤\n                                  └→ Build Ollama Request\n                                        → Call Ollama API\n                                          ├─ success → Parse LLM Response ─┐\n                                          └─ error   → Handle Ollama Error ─┤\n                                                                             └→ Save to DB\n```\n\n**Changes from v5.1:**\n- Removed: manual Wait/Resume, pending_analysis table flow\n- Added: Ollama LLM call (synchronous, fully automatic)\n- Graceful degradation: errors produce 'uncertain' records, never break the pipeline\n\n**Configuration:**\n- Model: set `OLLAMA_MODEL` env var in docker-compose.yml (default: mistral)\n- Timeout: 300s — increase for slow CPU inference or large models\n- format:'json' enforces structured output (Ollama >= 0.1.9)\n\n**Rollback:** import wazuh_fp_detector_v5.1_public.json for the human-in-the-loop version.\n**Upgrade path:** see v6.2 (OpenRouter) for a cloud API variant with the same architecture.",
+        "height": 400,
+        "width": 540
+      },
+      "name": "Sticky Note - v6.1 Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-960, 384],
+      "id": "node-sticky-overview"
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-20250514",
+        "options": {}
+      },
+      "name": "Anthropic API (DISABLED - cloud backup)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.1,
+      "position": [480, 368],
+      "id": "node-anthropic-disabled",
+      "disabled": true,
+      "notes": "Cloud fallback. To activate: disable 'Call Ollama API', enable this node, connect Build Ollama Request → this node → Parse LLM Response. Requires Anthropic credential in n8n Settings → Credentials."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Wazuh Alert": {
+      "main": [[{"node": "Extract Alert", "type": "main", "index": 0}]]
+    },
+    "Extract Alert": {
+      "main": [[{"node": "MCP - Enrich Alert", "type": "main", "index": 0}]]
+    },
+    "MCP - Enrich Alert": {
+      "main": [[{"node": "Check MCP Success", "type": "main", "index": 0}]]
+    },
+    "Check MCP Success": {
+      "main": [
+        [{"node": "Prepare AI Prompt",  "type": "main", "index": 0}],
+        [{"node": "Fallback - No MCP",  "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare AI Prompt": {
+      "main": [[{"node": "Build Ollama Request", "type": "main", "index": 0}]]
+    },
+    "Fallback - No MCP": {
+      "main": [[{"node": "Build Ollama Request", "type": "main", "index": 0}]]
+    },
+    "Build Ollama Request": {
+      "main": [[{"node": "Call Ollama API", "type": "main", "index": 0}]]
+    },
+    "Call Ollama API": {
+      "main": [
+        [{"node": "Parse LLM Response",   "type": "main", "index": 0}],
+        [{"node": "Handle Ollama Error",  "type": "main", "index": 0}]
+      ]
+    },
+    "Parse LLM Response": {
+      "main": [[{"node": "Save to ai_analysis_results", "type": "main", "index": 0}]]
+    },
+    "Handle Ollama Error": {
+      "main": [[{"node": "Save to ai_analysis_results", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "meta": {
+    "instanceId": "REPLACE-WITH-YOUR-INSTANCE-ID"
+  },
+  "tags": ["wazuh", "siem", "false-positive", "mcp", "ollama", "local-llm", "automatic"]
+}
