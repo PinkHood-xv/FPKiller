@@ -1,0 +1,103 @@
+<!-- Local rules — Wazuh False Positive Detector Lab
+     =================================================
+     File: /var/ossec/etc/rules/local_rules.xml
+
+     Rule ID ranges:
+       100001-100009  Integration test rules
+       100010-100019  Intentional false-positive patterns
+       100020-100029  Legitimate high-severity events
+       100030-100039  AI test patterns
+
+     After editing:
+       sudo /var/ossec/bin/wazuh-logtest   # validate syntax
+       sudo systemctl restart wazuh-manager
+
+     Notes:
+       - IDs 100000+ are the reserved range for custom local rules.
+       - Rule IDs must be unique across all loaded rule files.
+       - <if_sid> references Wazuh built-in SSH rules (5500, 5716).
+         Adjust if your Wazuh version uses different base rule IDs.
+-->
+
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!-- ─── GROUP 1: Integration connectivity tests ─────────────────────────── -->
+<group name="local,syslog,">
+
+  <!--
+    Rule 100001 — Generic N8N integration test
+    Triggered by: logger -p local0.info "test-alert: <message>"
+    Purpose: verify the full pipeline (Target → Wazuh → N8N) is working.
+  -->
+  <rule id="100001" level="5">
+    <match>test-alert</match>
+    <description>Test alert for N8N integration</description>
+  </rule>
+
+</group>
+
+
+<!-- ─── GROUP 2: SSH-specific test rules ────────────────────────────────── -->
+<group name="local,syslog,sshd,">
+
+  <!--
+    Rule 100002 — SSH auth failure from a specific source IP
+    Triggered by: failed SSH login attempts from the configured <srcip>.
+    Purpose: simulate a targeted brute-force for AI false-positive training.
+
+    CUSTOMISE: replace the <srcip> with an IP relevant to your lab network.
+    Example lab value: 192.168.30.0/24 (LAN_TARGET subnet).
+
+    Syslog example that triggers parent rule 5716:
+      Dec 10 01:02:02 host sshd[1234]: Failed none for root from 192.168.30.100 port 1066 ssh2
+  -->
+  <rule id="100002" level="5">
+    <if_sid>5716</if_sid>
+    <srcip>192.168.30.0/24</srcip>
+    <description>sshd: authentication failed from lab target network (expected FP pattern)</description>
+    <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5,</group>
+  </rule>
+
+</group>
+
+
+<!-- ─── GROUP 3: Lab AI training scenarios ──────────────────────────────── -->
+<group name="lab_test,">
+
+  <!--
+    Rule 100010 — Intentional false-positive: SSH with 'root' keyword
+    Parent: 5500 (Wazuh built-in SSH group)
+    Level 8 = "medium-high" — will look serious but is expected in this lab.
+    Expected AI verdict: false_positive (internal network, lab context).
+  -->
+  <rule id="100010" level="8">
+    <if_sid>5500</if_sid>
+    <match>root</match>
+    <description>Possible brute force (expected FP in lab — root activity on test agent)</description>
+  </rule>
+
+  <!--
+    Rule 100020 — Intentional legitimate threat: critical syslog keyword
+    Triggered by: logger -p local0.crit "CRITICAL_SECURITY_EVENT: <message>"
+    Level 12 = "high severity" — should be escalated.
+    Expected AI verdict: legitimate_threat.
+  -->
+  <rule id="100020" level="12">
+    <decoded_as>syslog</decoded_as>
+    <match>CRITICAL_SECURITY_EVENT</match>
+    <description>Critical security event detected</description>
+  </rule>
+
+  <!--
+    Rule 100030 — AI test pattern marker
+    Triggered by: logger "AI_TEST_: <description>"
+    Level 5 = "medium" — neutral alert for pipeline testing.
+    Used to generate controlled test events without triggering real rules.
+    Expected AI verdict: varies (depends on the message content).
+  -->
+  <rule id="100030" level="5">
+    <match>AI_TEST_</match>
+    <description>AI testing pattern — controlled lab event</description>
+  </rule>
+
+</group>
