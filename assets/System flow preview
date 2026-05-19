@@ -1,0 +1,237 @@
+import { useState, useEffect } from "react";
+
+const theme = {
+  bg: "#0a0c10",
+  surface: "#0f1318",
+  border: "#1e2530",
+  target: { bg: "#0f1a10", border: "#1a3520", accent: "#22c55e", dim: "#15803d" },
+  siem:   { bg: "#0f1520", border: "#1a2535", accent: "#3b82f6", dim: "#1d4ed8" },
+  ai:     { bg: "#14100f", border: "#2a1e18", accent: "#f97316", dim: "#c2410c" },
+  llm:    { bg: "#120f18", border: "#241a30", accent: "#a855f7", dim: "#7e22ce" },
+  db:     { bg: "#0f1318", border: "#1e2d30", accent: "#06b6d4", dim: "#0e7490" },
+  block:  { accent: "#ef4444" },
+  text:   { primary: "#e2e8f0", secondary: "#94a3b8", muted: "#475569" },
+  fw:     { bg: "#111318", border: "#2a2f3a", accent: "#fbbf24" },
+};
+
+const FONT = "'JetBrains Mono', 'Fira Code', monospace";
+
+function Node({ x, y, w, h, t, label, sublabel, icon, small }) {
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} rx={6}
+        fill={t.bg} stroke={t.border} strokeWidth={1.5} />
+      <rect x={x} y={y} width={w} height={2} fill={t.accent} opacity={0.8} />
+      <text x={x+w/2} y={y+(small?20:24)} textAnchor="middle"
+        fontFamily={FONT} fontSize={small?9:11} fontWeight="700"
+        fill={t.accent} letterSpacing="0.08em">{icon} {label}</text>
+      {sublabel && <text x={x+w/2} y={y+(small?34:40)} textAnchor="middle"
+        fontFamily={FONT} fontSize={small?7.5:8.5}
+        fill={theme.text.secondary} letterSpacing="0.04em">{sublabel}</text>}
+    </g>
+  );
+}
+
+function Arr({ x1,y1,x2,y2, color, dashed, label, lx, ly }) {
+  const id = `m${color.replace('#','')}${x1}${y1}`;
+  return (
+    <g>
+      <defs>
+        <marker id={id} markerWidth={8} markerHeight={8} refX={6} refY={3} orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill={color}/>
+        </marker>
+      </defs>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1.5}
+        strokeDasharray={dashed?"5,4":undefined}
+        markerEnd={`url(#${id})`} opacity={0.85}/>
+      {label && <text x={lx??(x1+x2)/2} y={ly??((y1+y2)/2-5)} textAnchor="middle"
+        fontFamily={FONT} fontSize={7.5} fill={color} opacity={0.9} letterSpacing="0.06em">{label}</text>}
+    </g>
+  );
+}
+
+function Dot({ x1,y1,x2,y2,color,phase }) {
+  const t = (phase%12)/12;
+  return (
+    <circle cx={x1+(x2-x1)*t} cy={y1+(y2-y1)*t} r={3} fill={color} opacity={0.85}>
+      <animate attributeName="opacity" values="0;1;0" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+  );
+}
+
+export default function App() {
+  const [tick, setTick] = useState(0);
+  useEffect(()=>{ const id=setInterval(()=>setTick(x=>x+1),160); return()=>clearInterval(id); },[]);
+
+  const W=900, H=560;
+
+  return (
+    <div style={{background:"#06080c",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{background:theme.bg,borderRadius:10,border:`1px solid ${theme.border}`,boxShadow:"0 0 80px rgba(0,0,0,0.9)",maxWidth:"100%",overflow:"hidden"}}>
+
+        {/* Title bar */}
+        <div style={{padding:"12px 20px",borderBottom:`1px solid ${theme.border}`,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{display:"flex",gap:6}}>
+            {["#ef4444","#fbbf24","#22c55e"].map(c=>(
+              <div key={c} style={{width:10,height:10,borderRadius:"50%",background:c,opacity:0.8}}/>
+            ))}
+          </div>
+          <span style={{color:theme.text.secondary,fontSize:11,letterSpacing:"0.12em",fontFamily:FONT}}>
+            WAZUH FALSE POSITIVE DETECTOR — SYSTEM ARCHITECTURE
+          </span>
+        </div>
+
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{display:"block",maxWidth:"100%"}}>
+
+          {/* Zone backgrounds */}
+          {[
+            {x:18, y:60, w:155, h:H-80, c:theme.target.accent, l:"LAN_TARGET"},
+            {x:188,y:60, w:172, h:H-80, c:theme.siem.accent,   l:"LAN_SIEM"},
+            {x:375,y:60, w:506, h:H-80, c:theme.ai.accent,     l:"LAN_AI"},
+          ].map(z=>(
+            <g key={z.l}>
+              <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={8}
+                fill={z.c} fillOpacity={0.04} stroke={z.c} strokeWidth={1} strokeOpacity={0.18}/>
+              <rect x={z.x+8} y={z.y+10} width={90} height={16} rx={3} fill={z.c} fillOpacity={0.12}/>
+              <rect x={z.x+8} y={z.y+10} width={3} height={16} fill={z.c} fillOpacity={0.6}/>
+              <text x={z.x+17} y={z.y+21} fontFamily={FONT} fontSize={7} fontWeight="700"
+                fill={z.c} fillOpacity={0.9} letterSpacing="0.1em">{z.l}</text>
+            </g>
+          ))}
+
+          {/* Firewall bars */}
+          {[170,357].map(fx=>(
+            <g key={fx}>
+              <rect x={fx} y={60} width={22} height={H-80} fill={theme.fw.bg} stroke={theme.fw.border} strokeWidth={1}/>
+              <rect x={fx} y={60} width={22} height={H-80} fill={theme.fw.accent} fillOpacity={0.03}/>
+              <text x={fx+11} y={H/2} textAnchor="middle" fontFamily={FONT} fontSize={7.5} fontWeight="700"
+                fill={theme.fw.accent} fillOpacity={0.8} letterSpacing="0.12em"
+                transform={`rotate(-90 ${fx+11} ${H/2})`}>pfSense FIREWALL</text>
+            </g>
+          ))}
+
+          {/* ─── TARGET ─── */}
+          <Node x={28} y={110} w={130} h={58} t={theme.target} label="TARGET VM" sublabel="Wazuh Agent" icon="⬡"/>
+
+          <rect x={35} y={198} width={116} height={28} rx={4} fill="#0a0f0a" stroke={theme.target.border} strokeWidth={1}/>
+          <text x={93} y={208} textAnchor="middle" fontFamily={FONT} fontSize={7} fill={theme.target.dim}>EVENT GENERATORS</text>
+          <text x={93} y={220} textAnchor="middle" fontFamily={FONT} fontSize={7.5} fill={theme.target.accent}>logger / ssh / sudo</text>
+
+          <Arr x1={93} y1={168} x2={93} y2={195} color={theme.target.accent} label="syslog" ly={183}/>
+
+          <rect x={40} y={260} width={102} height={22} rx={4} fill={theme.target.bg} stroke={theme.target.border} strokeWidth={1}/>
+          <text x={91} y={275} textAnchor="middle" fontFamily={FONT} fontSize={8} fill={theme.target.accent} letterSpacing="0.06em">wazuh-agent</text>
+          <Arr x1={93} y1={226} x2={93} y2={257} color={theme.target.dim}/>
+
+          <Arr x1={142} y1={271} x2={205} y2={271} color={theme.target.accent} label="TCP 1514/1515" ly={265}/>
+
+          {/* BLOCKED */}
+          <line x1={93} y1={282} x2={93} y2={390} stroke={theme.block.accent} strokeWidth={1.2} strokeDasharray="4,4" opacity={0.5}/>
+          <Arr x1={93} y1={390} x2={370} y2={390} color={theme.block.accent} dashed label="BLOCKED" ly={384}/>
+          <g>
+            <rect x={79} y={381} width={28} height={18} rx={3} fill="#1a0808" stroke={theme.block.accent} strokeWidth={1}/>
+            <text x={93} y={394} textAnchor="middle" fontFamily={FONT} fontSize={9} fontWeight="900" fill={theme.block.accent}>✕</text>
+          </g>
+
+          {/* ─── SIEM ─── */}
+          <Node x={197} y={110} w={148} h={58} t={theme.siem} label="WAZUH MANAGER" sublabel="wazuh-manager" icon="⬡"/>
+          <Node x={197} y={200} w={148} h={46} t={theme.siem} label="WAZUH INDEXER" sublabel="OpenSearch :9200" small icon="◈"/>
+          <Node x={197} y={270} w={148} h={46} t={theme.siem} label="WAZUH DASHBOARD" sublabel="HTTPS :443" small icon="◈"/>
+          <Arr x1={271} y1={168} x2={271} y2={197} color={theme.siem.dim}/>
+          <Arr x1={271} y1={246} x2={271} y2={267} color={theme.siem.dim}/>
+
+          <rect x={206} y={348} width={130} height={22} rx={4} fill={theme.siem.bg} stroke={theme.siem.border} strokeWidth={1}/>
+          <text x={271} y={363} textAnchor="middle" fontFamily={FONT} fontSize={8} fill={theme.siem.accent} letterSpacing="0.05em">wazuh-integratord</text>
+          <text x={271} y={380} textAnchor="middle" fontFamily={FONT} fontSize={7} fill={theme.text.muted}>custom-webhook.sh</text>
+          <Arr x1={271} y1={316} x2={271} y2={345} color={theme.siem.dim} label="alert" ly={332}/>
+          <Arr x1={337} y1={359} x2={410} y2={359} color={theme.siem.accent} label="HTTP POST :5678" ly={352}/>
+
+          {/* MCP back-query */}
+          <Arr x1={410} y1={220} x2={345} y2={220} color={theme.ai.dim} dashed label="API :55000 / :9200" lx={375} ly={213}/>
+
+          {/* ─── AI ─── */}
+          <Node x={388} y={100} w={148} h={70} t={theme.ai} label="N8N" sublabel="workflow automation :5678" icon="⬡"/>
+          <Node x={388} y={200} w={148} h={52} t={theme.ai} label="MCP SERVER" sublabel="alert enrichment :3333" small icon="◈"/>
+          <Arr x1={462} y1={170} x2={462} y2={197} color={theme.ai.accent} label="enrich" lx={448}/>
+          <Arr x1={536} y1={130} x2={590} y2={130} color={theme.llm.accent} label="prompt" ly={122}/>
+          <Arr x1={590} y1={160} x2={536} y2={160} color={theme.llm.dim} dashed label="verdict JSON" ly={152}/>
+          <Arr x1={462} y1={252} x2={462} y2={340} color={theme.db.accent} label="INSERT" lx={448}/>
+
+          {/* LLM panel */}
+          <rect x={590} y={86} width={178} height={128} rx={6} fill={theme.llm.bg} stroke={theme.llm.border} strokeWidth={1.5}/>
+          <rect x={590} y={86} width={178} height={2} fill={theme.llm.accent} fillOpacity={0.7}/>
+          <text x={679} y={103} textAnchor="middle" fontFamily={FONT} fontSize={9} fontWeight="700" fill={theme.llm.accent} letterSpacing="0.1em">LLM ENGINE</text>
+
+          {[
+            {y:110, title:"v5.1 · Manual gate",    sub:"Claude Pro / ChatGPT (web)"},
+            {y:142, title:"v6.1 · Local LLM",      sub:"Ollama :11434 (Docker)"},
+            {y:174, title:"v6.2 · Cloud API",      sub:"OpenRouter (HTTPS)"},
+          ].map(r=>(
+            <g key={r.y}>
+              <rect x={600} y={r.y} width={158} height={26} rx={4} fill="#0f0c18" stroke="#2a1e3a" strokeWidth={1}/>
+              <text x={679} y={r.y+11} textAnchor="middle" fontFamily={FONT} fontSize={7.5} fill={theme.llm.accent} letterSpacing="0.05em">{r.title}</text>
+              <text x={679} y={r.y+21} textAnchor="middle" fontFamily={FONT} fontSize={7} fill={theme.text.muted}>{r.sub}</text>
+            </g>
+          ))}
+
+          {/* PostgreSQL */}
+          <Node x={388} y={340} w={148} h={58} t={theme.db} label="POSTGRESQL" sublabel="ai_analysis_results" icon="◈"/>
+          <rect x={558} y={350} width={110} height={38} rx={4} fill={theme.db.bg} stroke={theme.db.border} strokeWidth={1}/>
+          <text x={613} y={363} textAnchor="middle" fontFamily={FONT} fontSize={7.5} fill={theme.db.accent} letterSpacing="0.05em">SOC ANALYST</text>
+          <text x={613} y={375} textAnchor="middle" fontFamily={FONT} fontSize={7} fill={theme.text.muted}>daily_fp_stats</text>
+          <text x={613} y={384} textAnchor="middle" fontFamily={FONT} fontSize={7} fill={theme.text.muted}>top_fp_rules</text>
+          <Arr x1={536} y1={369} x2={558} y2={369} color={theme.db.dim} dashed label="SELECT" ly={363}/>
+
+          {/* Internet */}
+          <ellipse cx={769} cy={310} rx={72} ry={36} fill="#0c1018" stroke="#1e2a30" strokeWidth={1} strokeDasharray="4,3" opacity={0.8}/>
+          <text x={769} y={305} textAnchor="middle" fontFamily={FONT} fontSize={8} fill={theme.text.muted}>INTERNET</text>
+          <text x={769} y={317} textAnchor="middle" fontFamily={FONT} fontSize={7} fill={theme.text.muted}>HTTPS :443</text>
+          <text x={769} y={328} textAnchor="middle" fontFamily={FONT} fontSize={7} fill={theme.text.muted}>OpenRouter API</text>
+          <Arr x1={720} y1={200} x2={769} y2={274} color={theme.text.muted} dashed label="v6.2 only" lx={760} ly={235}/>
+
+          {/* Legend */}
+          <rect x={390} y={440} width={480} height={84} rx={5} fill={theme.surface} stroke={theme.border} strokeWidth={1}/>
+          <text x={630} y={456} textAnchor="middle" fontFamily={FONT} fontSize={7.5} fontWeight="700" fill={theme.text.muted} letterSpacing="0.12em">LEGEND</text>
+          {[
+            {c:theme.target.accent, l:"LAN_TARGET — isolated segment, agents only"},
+            {c:theme.siem.accent,   l:"LAN_SIEM   — Wazuh all-in-one"},
+            {c:theme.ai.accent,     l:"LAN_AI     — Docker host: N8N · MCP · DB · LLM"},
+            {c:theme.block.accent,  l:"BLOCKED    — Target → AI (pfSense enforced)"},
+          ].map((item,i)=>(
+            <g key={i}>
+              <rect x={410} y={466+i*14} width={8} height={8} rx={2} fill={item.c}/>
+              <text x={424} y={474+i*14} fontFamily={FONT} fontSize={7.5} fill={theme.text.secondary} letterSpacing="0.04em">{item.l}</text>
+            </g>
+          ))}
+          {[
+            {x:700,l:"v5.1",d:"Human-in-the-loop",  c:theme.llm.accent},
+            {x:755,l:"v6.1",d:"Local LLM (Ollama)",  c:theme.ai.accent},
+            {x:815,l:"v6.2",d:"Cloud (OpenRouter)",   c:theme.siem.accent},
+          ].map(b=>(
+            <g key={b.l}>
+              <rect x={b.x} y={462} width={50} height={32} rx={3}
+                fill={b.c} fillOpacity={0.08} stroke={b.c} strokeWidth={0.8} strokeOpacity={0.4}/>
+              <text x={b.x+25} y={474} textAnchor="middle" fontFamily={FONT} fontSize={8} fontWeight="700" fill={b.c} letterSpacing="0.06em">{b.l}</text>
+              <text x={b.x+25} y={485} textAnchor="middle" fontFamily={FONT} fontSize={6} fill={theme.text.muted}>{b.d.split(" ")[0]}</text>
+              <text x={b.x+25} y={493} textAnchor="middle" fontFamily={FONT} fontSize={6} fill={theme.text.muted}>{b.d.split(" ").slice(1).join(" ")}</text>
+            </g>
+          ))}
+
+          {/* Animated dots */}
+          {[
+            {x1:93,  y1:168, x2:93,  y2:195, c:theme.target.accent, ph:tick},
+            {x1:197, y1:271, x2:340, y2:271, c:theme.siem.accent,   ph:tick+4},
+            {x1:340, y1:359, x2:409, y2:359, c:theme.ai.accent,     ph:tick+8},
+            {x1:462, y1:170, x2:462, y2:197, c:theme.ai.accent,     ph:tick+2},
+          ].map((d,i)=>{
+            const t=((d.ph+i*3)%12)/12;
+            const cx=d.x1+(d.x2-d.x1)*t;
+            const cy=d.y1+(d.y2-d.y1)*t;
+            return <circle key={i} cx={cx} cy={cy} r={3} fill={d.c} opacity={0.9}/>;
+          })}
+
+        </svg>
+      </div>
+    </div>
+  );
+}
