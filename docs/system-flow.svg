@@ -1,0 +1,448 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="900" height="560" viewBox="0 0 900 560">
+
+  <defs>
+
+    <!-- ── Embedded font fallback ── -->
+    <style>
+      text {
+        font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+      }
+    </style>
+
+    <!-- ── Arrowhead markers ── -->
+    <marker id="arr-green"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/></marker>
+    <marker id="arr-gdim"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#15803d"/></marker>
+    <marker id="arr-blue"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/></marker>
+    <marker id="arr-bdim"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1d4ed8"/></marker>
+    <marker id="arr-orange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f97316"/></marker>
+    <marker id="arr-odim"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#c2410c"/></marker>
+    <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#a855f7"/></marker>
+    <marker id="arr-pdim"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#7e22ce"/></marker>
+    <marker id="arr-cyan"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#06b6d4"/></marker>
+    <marker id="arr-cdim"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#0e7490"/></marker>
+    <marker id="arr-red"    markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+    <marker id="arr-muted"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#475569"/></marker>
+
+    <!-- ── Glow filters ── -->
+    <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- ── Motion paths for animated dots ── -->
+    <!-- dot1: target syslog vertical 93,168 → 93,196 -->
+    <path id="path-dot1" d="M93,168 L93,196" fill="none"/>
+    <!-- dot2: agent → wazuh horizontal 142,271 → 205,271 -->
+    <path id="path-dot2" d="M142,271 L205,271" fill="none"/>
+    <!-- dot3: integratord → n8n 337,359 → 410,359 -->
+    <path id="path-dot3" d="M337,359 L410,359" fill="none"/>
+    <!-- dot4: n8n → mcp vertical 462,170 → 462,198 -->
+    <path id="path-dot4" d="M462,170 L462,198" fill="none"/>
+
+  </defs>
+
+  <!-- ════════════════════════════════════════════
+       BACKGROUND
+  ════════════════════════════════════════════ -->
+  <rect width="900" height="560" fill="#0a0c10"/>
+
+  <!-- ════════════════════════════════════════════
+       ZONE BACKGROUNDS
+  ════════════════════════════════════════════ -->
+
+  <!-- LAN_TARGET -->
+  <rect x="18" y="60" width="155" height="480" rx="8"
+    fill="#22c55e" fill-opacity="0.04"
+    stroke="#22c55e" stroke-width="1" stroke-opacity="0.18"/>
+  <rect x="26" y="70" width="90" height="16" rx="3"
+    fill="#22c55e" fill-opacity="0.12"/>
+  <rect x="26" y="70" width="3" height="16" fill="#22c55e" fill-opacity="0.6"/>
+  <text x="43" y="81" font-size="7" font-weight="700" fill="#22c55e" fill-opacity="0.9"
+    letter-spacing="0.1em">LAN_TARGET</text>
+
+  <!-- LAN_SIEM -->
+  <rect x="188" y="60" width="172" height="480" rx="8"
+    fill="#3b82f6" fill-opacity="0.04"
+    stroke="#3b82f6" stroke-width="1" stroke-opacity="0.18"/>
+  <rect x="196" y="70" width="80" height="16" rx="3"
+    fill="#3b82f6" fill-opacity="0.12"/>
+  <rect x="196" y="70" width="3" height="16" fill="#3b82f6" fill-opacity="0.6"/>
+  <text x="213" y="81" font-size="7" font-weight="700" fill="#3b82f6" fill-opacity="0.9"
+    letter-spacing="0.1em">LAN_SIEM</text>
+
+  <!-- LAN_AI -->
+  <rect x="375" y="60" width="506" height="480" rx="8"
+    fill="#f97316" fill-opacity="0.04"
+    stroke="#f97316" stroke-width="1" stroke-opacity="0.18"/>
+  <rect x="383" y="70" width="60" height="16" rx="3"
+    fill="#f97316" fill-opacity="0.12"/>
+  <rect x="383" y="70" width="3" height="16" fill="#f97316" fill-opacity="0.6"/>
+  <text x="400" y="81" font-size="7" font-weight="700" fill="#f97316" fill-opacity="0.9"
+    letter-spacing="0.1em">LAN_AI</text>
+
+  <!-- ════════════════════════════════════════════
+       PFSENSE FIREWALL BARS
+  ════════════════════════════════════════════ -->
+
+  <!-- Left firewall bar (TARGET | SIEM) -->
+  <rect x="170" y="60" width="22" height="480"
+    fill="#111318" stroke="#2a2f3a" stroke-width="1"/>
+  <rect x="170" y="60" width="22" height="480"
+    fill="#fbbf24" fill-opacity="0.03"/>
+  <text x="181" y="300" text-anchor="middle"
+    font-size="7.5" font-weight="700" fill="#fbbf24" fill-opacity="0.8"
+    letter-spacing="0.12em"
+    transform="rotate(-90 181 300)">pfSense FIREWALL</text>
+
+  <!-- Right firewall bar (SIEM | AI) -->
+  <rect x="357" y="60" width="22" height="480"
+    fill="#111318" stroke="#2a2f3a" stroke-width="1"/>
+  <rect x="357" y="60" width="22" height="480"
+    fill="#fbbf24" fill-opacity="0.03"/>
+  <text x="368" y="300" text-anchor="middle"
+    font-size="7.5" font-weight="700" fill="#fbbf24" fill-opacity="0.8"
+    letter-spacing="0.12em"
+    transform="rotate(-90 368 300)">pfSense FIREWALL</text>
+
+  <!-- ════════════════════════════════════════════
+       COLUMN 1 — LAN_TARGET
+  ════════════════════════════════════════════ -->
+
+  <!-- TARGET VM node -->
+  <rect x="28" y="110" width="130" height="58" rx="6"
+    fill="#0f1a10" stroke="#1a3520" stroke-width="1.5"/>
+  <rect x="28" y="110" width="130" height="2" fill="#22c55e" opacity="0.8"/>
+  <text x="93" y="130" text-anchor="middle" font-size="11" font-weight="700"
+    fill="#22c55e" letter-spacing="0.08em">⬡ TARGET VM</text>
+  <text x="93" y="146" text-anchor="middle" font-size="8.5"
+    fill="#94a3b8" letter-spacing="0.04em">Wazuh Agent</text>
+
+  <!-- Event generators box -->
+  <rect x="35" y="198" width="116" height="28" rx="4"
+    fill="#0a0f0a" stroke="#1a3520" stroke-width="1"/>
+  <text x="93" y="210" text-anchor="middle" font-size="7"
+    fill="#15803d" letter-spacing="0.05em">EVENT GENERATORS</text>
+  <text x="93" y="220" text-anchor="middle" font-size="7.5"
+    fill="#22c55e">logger / ssh / sudo</text>
+
+  <!-- Arrow: target → generators -->
+  <line x1="93" y1="168" x2="93" y2="195"
+    stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)"/>
+  <text x="107" y="183" font-size="7.5" fill="#22c55e"
+    letter-spacing="0.06em">syslog</text>
+
+  <!-- wazuh-agent pill -->
+  <rect x="40" y="260" width="102" height="22" rx="4"
+    fill="#0f1a10" stroke="#1a3520" stroke-width="1"/>
+  <text x="91" y="275" text-anchor="middle" font-size="8"
+    fill="#22c55e" letter-spacing="0.06em">wazuh-agent</text>
+
+  <!-- Arrow: generators → agent -->
+  <line x1="93" y1="226" x2="93" y2="257"
+    stroke="#15803d" stroke-width="1.5" marker-end="url(#arr-gdim)"/>
+
+  <!-- Arrow: agent → wazuh manager (crosses firewall) -->
+  <line x1="142" y1="271" x2="205" y2="271"
+    stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)"/>
+  <text x="174" y="265" text-anchor="middle" font-size="7.5"
+    fill="#22c55e" letter-spacing="0.06em">TCP 1514/1515</text>
+
+  <!-- BLOCKED: target → AI dashed red line + arrow -->
+  <line x1="93" y1="282" x2="93" y2="390"
+    stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,4" opacity="0.5"/>
+  <line x1="93" y1="390" x2="370" y2="390"
+    stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,4"
+    marker-end="url(#arr-red)" opacity="0.85"/>
+  <text x="230" y="384" text-anchor="middle" font-size="7.5"
+    fill="#ef4444" letter-spacing="0.06em" opacity="0.9">BLOCKED</text>
+  <!-- X badge -->
+  <rect x="79" y="381" width="28" height="18" rx="3"
+    fill="#1a0808" stroke="#ef4444" stroke-width="1"/>
+  <text x="93" y="394" text-anchor="middle" font-size="9"
+    font-weight="900" fill="#ef4444">✕</text>
+
+  <!-- ════════════════════════════════════════════
+       COLUMN 2 — LAN_SIEM
+  ════════════════════════════════════════════ -->
+
+  <!-- WAZUH MANAGER node -->
+  <rect x="197" y="110" width="148" height="58" rx="6"
+    fill="#0f1520" stroke="#1a2535" stroke-width="1.5"/>
+  <rect x="197" y="110" width="148" height="2" fill="#3b82f6" opacity="0.8"/>
+  <text x="271" y="130" text-anchor="middle" font-size="11" font-weight="700"
+    fill="#3b82f6" letter-spacing="0.08em">⬡ WAZUH MANAGER</text>
+  <text x="271" y="146" text-anchor="middle" font-size="8.5"
+    fill="#94a3b8" letter-spacing="0.04em">wazuh-manager</text>
+
+  <!-- WAZUH INDEXER node -->
+  <rect x="197" y="200" width="148" height="46" rx="6"
+    fill="#0f1520" stroke="#1a2535" stroke-width="1.5"/>
+  <rect x="197" y="200" width="148" height="2" fill="#3b82f6" opacity="0.8"/>
+  <text x="271" y="218" text-anchor="middle" font-size="9" font-weight="700"
+    fill="#3b82f6" letter-spacing="0.08em">◈ WAZUH INDEXER</text>
+  <text x="271" y="232" text-anchor="middle" font-size="7.5"
+    fill="#94a3b8" letter-spacing="0.04em">OpenSearch :9200</text>
+
+  <!-- WAZUH DASHBOARD node -->
+  <rect x="197" y="270" width="148" height="46" rx="6"
+    fill="#0f1520" stroke="#1a2535" stroke-width="1.5"/>
+  <rect x="197" y="270" width="148" height="2" fill="#3b82f6" opacity="0.8"/>
+  <text x="271" y="288" text-anchor="middle" font-size="9" font-weight="700"
+    fill="#3b82f6" letter-spacing="0.08em">◈ WAZUH DASHBOARD</text>
+  <text x="271" y="302" text-anchor="middle" font-size="7.5"
+    fill="#94a3b8" letter-spacing="0.04em">HTTPS :443</text>
+
+  <!-- Arrow: manager → indexer -->
+  <line x1="271" y1="168" x2="271" y2="197"
+    stroke="#1d4ed8" stroke-width="1.5" marker-end="url(#arr-bdim)"/>
+
+  <!-- Arrow: indexer → dashboard -->
+  <line x1="271" y1="246" x2="271" y2="267"
+    stroke="#1d4ed8" stroke-width="1.5" marker-end="url(#arr-bdim)"/>
+
+  <!-- wazuh-integratord box -->
+  <rect x="206" y="348" width="130" height="36" rx="4"
+    fill="#0f1520" stroke="#1a2535" stroke-width="1"/>
+  <text x="271" y="363" text-anchor="middle" font-size="8"
+    fill="#3b82f6" letter-spacing="0.05em">wazuh-integratord</text>
+  <text x="271" y="376" text-anchor="middle" font-size="7"
+    fill="#475569">custom-webhook.sh</text>
+
+  <!-- Arrow: manager → integratord -->
+  <line x1="271" y1="316" x2="271" y2="345"
+    stroke="#1d4ed8" stroke-width="1.5" marker-end="url(#arr-bdim)"/>
+  <text x="285" y="332" font-size="7.5" fill="#1d4ed8">alert</text>
+
+  <!-- Arrow: integratord → N8N (crosses firewall) -->
+  <line x1="337" y1="366" x2="410" y2="366"
+    stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <text x="373" y="360" text-anchor="middle" font-size="7.5"
+    fill="#3b82f6" letter-spacing="0.06em">HTTP POST :5678</text>
+
+  <!-- MCP back-query to Wazuh API (dashed orange) -->
+  <line x1="410" y1="220" x2="345" y2="220"
+    stroke="#c2410c" stroke-width="1.5" stroke-dasharray="5,4"
+    marker-end="url(#arr-odim)" opacity="0.85"/>
+  <text x="377" y="213" text-anchor="middle" font-size="7.5"
+    fill="#c2410c" opacity="0.9">API :55000 / :9200</text>
+
+  <!-- ════════════════════════════════════════════
+       COLUMN 3 — LAN_AI
+  ════════════════════════════════════════════ -->
+
+  <!-- N8N node -->
+  <rect x="388" y="100" width="148" height="70" rx="6"
+    fill="#14100f" stroke="#2a1e18" stroke-width="1.5"/>
+  <rect x="388" y="100" width="148" height="2" fill="#f97316" opacity="0.8"/>
+  <text x="462" y="124" text-anchor="middle" font-size="11" font-weight="700"
+    fill="#f97316" letter-spacing="0.08em">⬡ N8N</text>
+  <text x="462" y="140" text-anchor="middle" font-size="8.5"
+    fill="#94a3b8" letter-spacing="0.04em">workflow automation :5678</text>
+
+  <!-- MCP SERVER node -->
+  <rect x="388" y="200" width="148" height="52" rx="6"
+    fill="#14100f" stroke="#2a1e18" stroke-width="1.5"/>
+  <rect x="388" y="200" width="148" height="2" fill="#f97316" opacity="0.8"/>
+  <text x="462" y="220" text-anchor="middle" font-size="9" font-weight="700"
+    fill="#f97316" letter-spacing="0.08em">◈ MCP SERVER</text>
+  <text x="462" y="234" text-anchor="middle" font-size="7.5"
+    fill="#94a3b8" letter-spacing="0.04em">alert enrichment :3333</text>
+
+  <!-- Arrow: N8N → MCP -->
+  <line x1="462" y1="170" x2="462" y2="197"
+    stroke="#f97316" stroke-width="1.5" marker-end="url(#arr-orange)"/>
+  <text x="451" y="185" font-size="7.5" fill="#f97316">enrich</text>
+
+  <!-- Arrow: N8N → LLM Engine -->
+  <line x1="536" y1="130" x2="590" y2="130"
+    stroke="#a855f7" stroke-width="1.5" marker-end="url(#arr-purple)"/>
+  <text x="562" y="122" text-anchor="middle" font-size="7.5"
+    fill="#a855f7">prompt</text>
+
+  <!-- Arrow: LLM → N8N (verdict, dashed) -->
+  <line x1="590" y1="158" x2="536" y2="158"
+    stroke="#7e22ce" stroke-width="1.5" stroke-dasharray="5,4"
+    marker-end="url(#arr-pdim)" opacity="0.85"/>
+  <text x="562" y="152" text-anchor="middle" font-size="7.5"
+    fill="#7e22ce" opacity="0.9">verdict JSON</text>
+
+  <!-- Arrow: N8N → PostgreSQL -->
+  <line x1="462" y1="252" x2="462" y2="340"
+    stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+  <text x="451" y="298" font-size="7.5" fill="#06b6d4">INSERT</text>
+
+  <!-- ── LLM ENGINE PANEL ── -->
+  <rect x="590" y="86" width="178" height="128" rx="6"
+    fill="#120f18" stroke="#241a30" stroke-width="1.5"/>
+  <rect x="590" y="86" width="178" height="2"
+    fill="#a855f7" fill-opacity="0.7"/>
+  <text x="679" y="103" text-anchor="middle" font-size="9" font-weight="700"
+    fill="#a855f7" letter-spacing="0.1em">LLM ENGINE</text>
+
+  <!-- v5.1 row -->
+  <rect x="600" y="110" width="158" height="26" rx="4"
+    fill="#0f0c18" stroke="#2a1e3a" stroke-width="1"/>
+  <text x="679" y="121" text-anchor="middle" font-size="7.5"
+    fill="#a855f7" letter-spacing="0.05em">v5.1 · Manual gate</text>
+  <text x="679" y="131" text-anchor="middle" font-size="7"
+    fill="#475569">Claude Pro / ChatGPT (web)</text>
+
+  <!-- v6.1 row -->
+  <rect x="600" y="142" width="158" height="26" rx="4"
+    fill="#0f0c18" stroke="#2a1e3a" stroke-width="1"/>
+  <text x="679" y="153" text-anchor="middle" font-size="7.5"
+    fill="#a855f7" letter-spacing="0.05em">v6.1 · Local LLM</text>
+  <text x="679" y="163" text-anchor="middle" font-size="7"
+    fill="#475569">Ollama :11434 (Docker)</text>
+
+  <!-- v6.2 row -->
+  <rect x="600" y="174" width="158" height="26" rx="4"
+    fill="#0f0c18" stroke="#2a1e3a" stroke-width="1"/>
+  <text x="679" y="185" text-anchor="middle" font-size="7.5"
+    fill="#a855f7" letter-spacing="0.05em">v6.2 · Cloud API</text>
+  <text x="679" y="195" text-anchor="middle" font-size="7"
+    fill="#475569">OpenRouter (HTTPS)</text>
+
+  <!-- ── POSTGRESQL ── -->
+  <rect x="388" y="340" width="148" height="58" rx="6"
+    fill="#0f1318" stroke="#1e2d30" stroke-width="1.5"/>
+  <rect x="388" y="340" width="148" height="2" fill="#06b6d4" opacity="0.8"/>
+  <text x="462" y="362" text-anchor="middle" font-size="11" font-weight="700"
+    fill="#06b6d4" letter-spacing="0.08em">◈ POSTGRESQL</text>
+  <text x="462" y="378" text-anchor="middle" font-size="8.5"
+    fill="#94a3b8" letter-spacing="0.04em">ai_analysis_results</text>
+
+  <!-- SOC Analyst box -->
+  <rect x="558" y="350" width="110" height="38" rx="4"
+    fill="#0f1318" stroke="#1e2d30" stroke-width="1"/>
+  <text x="613" y="363" text-anchor="middle" font-size="7.5"
+    fill="#06b6d4" letter-spacing="0.05em">SOC ANALYST</text>
+  <text x="613" y="375" text-anchor="middle" font-size="7"
+    fill="#475569">daily_fp_stats</text>
+  <text x="613" y="384" text-anchor="middle" font-size="7"
+    fill="#475569">top_fp_rules</text>
+
+  <!-- Arrow: PostgreSQL → SOC Analyst (dashed) -->
+  <line x1="536" y1="369" x2="558" y2="369"
+    stroke="#0e7490" stroke-width="1.5" stroke-dasharray="5,4"
+    marker-end="url(#arr-cdim)" opacity="0.85"/>
+  <text x="547" y="363" text-anchor="middle" font-size="7.5"
+    fill="#0e7490" opacity="0.9">SELECT</text>
+
+  <!-- ── INTERNET CLOUD ── -->
+  <ellipse cx="769" cy="310" rx="72" ry="36"
+    fill="#0c1018" stroke="#1e2a30" stroke-width="1"
+    stroke-dasharray="4,3" opacity="0.8"/>
+  <text x="769" y="305" text-anchor="middle" font-size="8" fill="#475569">INTERNET</text>
+  <text x="769" y="317" text-anchor="middle" font-size="7" fill="#475569">HTTPS :443</text>
+  <text x="769" y="328" text-anchor="middle" font-size="7" fill="#475569">OpenRouter API</text>
+
+  <!-- Arrow: N8N → Internet (v6.2 only, dashed) -->
+  <line x1="720" y1="200" x2="769" y2="274"
+    stroke="#475569" stroke-width="1.5" stroke-dasharray="5,4"
+    marker-end="url(#arr-muted)" opacity="0.7"/>
+  <text x="762" y="235" font-size="7.5" fill="#475569" opacity="0.9">v6.2 only</text>
+
+  <!-- ════════════════════════════════════════════
+       LEGEND
+  ════════════════════════════════════════════ -->
+  <rect x="390" y="440" width="480" height="84" rx="5"
+    fill="#0f1318" stroke="#1e2530" stroke-width="1"/>
+  <text x="630" y="456" text-anchor="middle" font-size="7.5" font-weight="700"
+    fill="#475569" letter-spacing="0.12em">LEGEND</text>
+
+  <!-- legend colour swatches + labels -->
+  <rect x="410" y="466" width="8" height="8" rx="2" fill="#22c55e"/>
+  <text x="424" y="474" font-size="7.5" fill="#94a3b8"
+    letter-spacing="0.04em">LAN_TARGET — isolated segment, agents only</text>
+
+  <rect x="410" y="480" width="8" height="8" rx="2" fill="#3b82f6"/>
+  <text x="424" y="488" font-size="7.5" fill="#94a3b8"
+    letter-spacing="0.04em">LAN_SIEM   — Wazuh all-in-one</text>
+
+  <rect x="410" y="494" width="8" height="8" rx="2" fill="#f97316"/>
+  <text x="424" y="502" font-size="7.5" fill="#94a3b8"
+    letter-spacing="0.04em">LAN_AI     — Docker host: N8N · MCP · DB · LLM</text>
+
+  <rect x="410" y="508" width="8" height="8" rx="2" fill="#ef4444"/>
+  <text x="424" y="516" font-size="7.5" fill="#94a3b8"
+    letter-spacing="0.04em">BLOCKED    — Target → AI (pfSense enforced)</text>
+
+  <!-- workflow version badges -->
+  <!-- v5.1 -->
+  <rect x="700" y="462" width="50" height="32" rx="3"
+    fill="#a855f7" fill-opacity="0.08"
+    stroke="#a855f7" stroke-width="0.8" stroke-opacity="0.4"/>
+  <text x="725" y="474" text-anchor="middle" font-size="8" font-weight="700"
+    fill="#a855f7" letter-spacing="0.06em">v5.1</text>
+  <text x="725" y="485" text-anchor="middle" font-size="6" fill="#475569">Human-in</text>
+  <text x="725" y="493" text-anchor="middle" font-size="6" fill="#475569">the-loop</text>
+
+  <!-- v6.1 -->
+  <rect x="755" y="462" width="50" height="32" rx="3"
+    fill="#f97316" fill-opacity="0.08"
+    stroke="#f97316" stroke-width="0.8" stroke-opacity="0.4"/>
+  <text x="780" y="474" text-anchor="middle" font-size="8" font-weight="700"
+    fill="#f97316" letter-spacing="0.06em">v6.1</text>
+  <text x="780" y="485" text-anchor="middle" font-size="6" fill="#475569">Local LLM</text>
+  <text x="780" y="493" text-anchor="middle" font-size="6" fill="#475569">(Ollama)</text>
+
+  <!-- v6.2 -->
+  <rect x="815" y="462" width="50" height="32" rx="3"
+    fill="#3b82f6" fill-opacity="0.08"
+    stroke="#3b82f6" stroke-width="0.8" stroke-opacity="0.4"/>
+  <text x="840" y="474" text-anchor="middle" font-size="8" font-weight="700"
+    fill="#3b82f6" letter-spacing="0.06em">v6.2</text>
+  <text x="840" y="485" text-anchor="middle" font-size="6" fill="#475569">Cloud</text>
+  <text x="840" y="493" text-anchor="middle" font-size="6" fill="#475569">(OpenRouter)</text>
+
+  <!-- ════════════════════════════════════════════
+       ANIMATED FLOW DOTS (pure SVG, GitHub safe)
+  ════════════════════════════════════════════ -->
+
+  <!-- dot1: target → event generators (vertical, green) -->
+  <circle r="3" fill="#22c55e" filter="url(#glow-green)">
+    <animateMotion dur="1.8s" repeatCount="indefinite" begin="0s">
+      <mpath xlink:href="#path-dot1"/>
+    </animateMotion>
+    <animate attributeName="opacity" values="0;1;1;0" dur="1.8s"
+      repeatCount="indefinite" begin="0s"/>
+  </circle>
+
+  <!-- dot2: agent → wazuh manager (horizontal, green) -->
+  <circle r="3" fill="#22c55e" filter="url(#glow-green)">
+    <animateMotion dur="1.6s" repeatCount="indefinite" begin="0.45s">
+      <mpath xlink:href="#path-dot2"/>
+    </animateMotion>
+    <animate attributeName="opacity" values="0;1;1;0" dur="1.6s"
+      repeatCount="indefinite" begin="0.45s"/>
+  </circle>
+
+  <!-- dot3: integratord → N8N (horizontal, blue) -->
+  <circle r="3" fill="#3b82f6" filter="url(#glow-blue)">
+    <animateMotion dur="1.6s" repeatCount="indefinite" begin="0.9s">
+      <mpath xlink:href="#path-dot3"/>
+    </animateMotion>
+    <animate attributeName="opacity" values="0;1;1;0" dur="1.6s"
+      repeatCount="indefinite" begin="0.9s"/>
+  </circle>
+
+  <!-- dot4: N8N → MCP server (vertical, orange) -->
+  <circle r="3" fill="#f97316" filter="url(#glow-orange)">
+    <animateMotion dur="1.4s" repeatCount="indefinite" begin="1.35s">
+      <mpath xlink:href="#path-dot4"/>
+    </animateMotion>
+    <animate attributeName="opacity" values="0;1;1;0" dur="1.4s"
+      repeatCount="indefinite" begin="1.35s"/>
+  </circle>
+
+</svg>
