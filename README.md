@@ -36,9 +36,8 @@ The result is a queryable dataset of AI verdicts that can drive Wazuh rule tunin
 
 ## Architecture
 
-![soc_project_flowchart](https://github.com/user-attachments/assets/4a3ce395-9c35-44a5-b29d-3784951bbdfa)
+![System Architecture](docs/system-flow.svg)
 
-## Architecture
  
 ### Network Topology
  
