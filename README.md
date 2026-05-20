@@ -1,5 +1,5 @@
 # FPKiller
-**An AI-powered False Positive alert triage automation using MCP, n8n, and LLM analysis.**
+**An AI-powered False Positive alert triage automation using MCP, N8N, and LLM analysis.**
 Automated Wazuh alert triage using N8N, a custom MCP server and a local LLM (Ollama) or cloud API (OpenRouter). Built as a VirtualBox home lab — reproduced at zero cost.
 
 ## Problem Statement
